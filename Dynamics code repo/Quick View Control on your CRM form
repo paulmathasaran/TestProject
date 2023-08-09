@@ -1,0 +1,14 @@
+When you use a quick view form on a CRM form and use that CRM form as a Basic form in Portal (or use in an advanced form step in a multi-step form) Portal wouldn't render that quick view form. This is the work around for show the quick view form.
+
+If it is a Basic form, add this code to the Custom JavaScript section under the Additional Settings tab of the Basic From in Portal Configuration.
+
+Replace "Quick_View_Control_Name" with the name of the Quick View Control on your CRM form.
+--
+
+$(window).on('load', function() 
+{
+    $("#Quick_View_Control_Name").height("400px");
+    $("#Quick_View_Control_Name").contents().find('body').show();  
+
+
+});

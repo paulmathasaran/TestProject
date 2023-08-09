@@ -1,0 +1,943 @@
+var CORE = CORE || {};
+CORE.Util = (function () { /********************* Polyfills *********************/
+    //https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/startsWith
+    if (!String.prototype.startsWith) {
+        String.prototype.startsWith = function (search, pos) {
+            return this.substr(!pos || pos < 0 ? 0 : +pos, search.length) === search;
+        };
+    }
+    if (!String.prototype.includes) {
+        String.prototype.includes = function (search, start) {
+            if (typeof start !== 'number') {
+                start = 0;
+            }
+            if (start + search.length > this.length) {
+                return false;
+            }
+            else {
+                return this.indexOf(search, start) !== -1;
+            }
+        };
+    }
+    Date.prototype.addDays = function (days) {
+        var date = new Date(this.valueOf());
+        date.setDate(date.getDate() + days);
+        return date;
+    } /******************************************/
+    return {
+        formatString: function (str, formatArgs) {
+            for (var p in formatArgs) {
+                str = str.replace(new RegExp('{' + p + '}', 'g'), formatArgs[p]);
+            }
+            return str;
+        },
+        getQueryStringParameter: function (keyName) {
+            var query = window.location.search.substring(1);
+            var keyValuePairs = query.split("&");
+            for (var i = 0; i < keyValuePairs.length; i++) {
+                var pair = keyValuePairs[i].split("=");
+                if (pair[0].toUpperCase() == keyName.toUpperCase()) {
+                    return pair[1];
+                }
+            }
+            return null;
+        },
+        getQueryStringParameterModal: function (keyName) {
+            var query = window.parent.location.search.substring(1);
+            var keyValuePairs = query.split("&");
+            for (var i = 0; i < keyValuePairs.length; i++) {
+                var pair = keyValuePairs[i].split("=");
+                if (pair[0].toUpperCase() == keyName.toUpperCase()) {
+                    return pair[1];
+                }
+            }
+            return null;
+        },
+        loadScriptAndExecute: function (scriptSrc, namespaceToEnsure, loadedCallback) {
+            //Attempt to check if the script has been loaded. This is not perfect though as we are only checking if the namespace has been loaded.
+            if ($("script[src='" + scriptSrc + "']").length > 0) {
+                var namespaceParts = namespaceToEnsure.split('.');
+                var currentObject = window[namespaceParts[0]];
+                if (currentObject != null) {
+                    for (var i = 1; i < namespaceParts.length; i++) {
+                        currentObject = currentObject[namespaceParts[i]];
+                        if (currentObject == null) {
+                            break;
+                        }
+                    }
+                    if (currentObject != null) {
+                        if (loadedCallback != null) {
+                            loadedCallback();
+                        }
+                        return;
+                    }
+                }
+            }
+            //https://stackoverflow.com/questions/14521108/dynamically-load-js-inside-js
+            var script = document.createElement('script');
+            script.onload = function () {
+                if (loadedCallback != null) {
+                    loadedCallback();
+                }
+            };
+            script.src = scriptSrc;
+            document.head.appendChild(script);
+        },
+        handleError: function (errorMessage) {
+            alert(errorMessage + "\n\n" + "Please contact the PBS help desk.");
+        },
+        isValidEmail: function (email) {
+            if (!email) {
+                return true;
+            }
+            // this regex is from W3C
+            // https://www.w3.org/TR/2012/WD-html-markup-20120315/input.email.html
+            var emailRegex = /^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
+            return emailRegex.test(email);
+        },
+        isValidEmails: function (emailArr) {
+            if (!emailArr || (emailArr && emailArr.length == 0)) {
+                return true;
+            }
+            for (var i = 0; i < emailArr.length; i++) {
+                var email = emailArr[i];
+                if (CORE.Util.isValidEmail(email) == false) {
+                    return false;
+                }
+            }
+            return true;
+        },
+        isValidDecimal: function (number) {
+            if (!number) {
+                return true;
+            }
+            // this regex is from https://stackoverflow.com/a/12117062
+            var decimalRegex = /^\d*\.?\d*$/;
+            return decimalRegex.test(number);
+        },
+        isValidNumber: function (number) {
+            if (!number) {
+                return true;
+            }
+            // matches be 0 and 999999999
+            var numberRegex = /^\d{1,9}$/;
+            return numberRegex.test(number);
+        },
+        toEmDashIfNullOrEmpty: function (stringValue) {
+            return stringValue == null || stringValue == "" ? "&mdash;" : stringValue;
+        },
+        //Returns undefined if entity name of the current form could not be determined.
+        getTargetEntityNameForCurrentForm: function () {
+            return $("#EntityFormView_EntityName").val();
+        },
+        //Code used from Ingredients project
+        convertBase64ToBlob: function (base64Data, contentType) {
+            contentType = contentType || '';
+            var sliceSize = 1024;
+            var byteCharacters = atob(base64Data);
+            var bytesLength = byteCharacters.length;
+            var slicesCount = Math.ceil(bytesLength / sliceSize);
+            var byteArrays = new Array(slicesCount);
+            for (var sliceIndex = 0; sliceIndex < slicesCount; ++sliceIndex) {
+                var begin = sliceIndex * sliceSize;
+                var end = Math.min(begin + sliceSize, bytesLength);
+                var bytes = new Array(end - begin);
+                for (var offset = begin, i = 0; offset < end; ++i, ++offset) {
+                    bytes[i] = byteCharacters[offset].charCodeAt(0);
+                }
+                byteArrays[sliceIndex] = new Uint8Array(bytes);
+            }
+            var blob = null;
+            try {
+                blob = new Blob(byteArrays,
+                    {
+                        type: contentType
+                    });
+            }
+            catch (e) {
+                // TypeError old chrome and FF
+                window.BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder || window.MSBlobBuilder;
+                if (e.name == 'TypeError' && window.BlobBuilder) {
+                    var bb = new BlobBuilder();
+                    bb.append(byteArrays);
+                    blob = bb.getBlob(contentType);
+                }
+                else if (e.name == "InvalidStateError") {
+                    // InvalidStateError (tested on FF13 WinXP)
+                    blob = new Blob(byteArrays,
+                        {
+                            type: contentType
+                        });
+                }
+                else { // unsupported entirely
+                }
+            }
+            return blob;
+        },
+        //Code used from Ingredients project
+        openPdfBlob: function (blob, fileName) {
+            var isIE = /*@cc_on!@*/
+                false || !!document.documentMode;
+            // Edge 20+
+            var isEdge = !isIE && !!window.StyleMedia;
+            if (isIE || isEdge) {
+                window.navigator.msSaveOrOpenBlob(blob, fileName);
+            }
+            else {
+                //http://stackoverflow.com/questions/19327749/javascript-blob-filename-without-link
+                var url = window.URL.createObjectURL(blob);
+                var a = $("<a style='display: none;'/>");
+                a.attr("href", url);
+                a.attr("download", fileName);
+                $("body").append(a);
+                a[0].click();
+                setTimeout(function () {
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                }, 50);
+            }
+        },
+        modifyOrganisation: function (id) {
+            var url = "/session/modifyorganisation/?id=" + id;
+            window.location.replace(url);
+        },
+        /*
+         * Polls the Note Id field and returns true if updated, then uses the new id to download the report
+         *
+         * An Unbound Action must be created for each entity. Naming convention = CORE - PollReport_<LogicalName>
+         * Create Action Input (Entity Reference) and Name it "Record"
+         * Create Action Input (String) and name it "NoteId"
+         * @param {object} data - variable from generateReport
+         * @param {string} currentNoteId - the current id of the note created for the report
+         *
+         */
+        downloadReport: function (entityRef, currentNoteId) {
+            var paramArray = [];
+            var rRef = {};
+            rRef.LogicalName = entityRef.LogicalName;
+            rRef.Id = entityRef.id;
+            var recordRef = {
+                'erefValue': rRef,
+                'key': 'Record',
+                'value': ''
+            };
+            var noteId = {
+                'key': 'NoteId',
+                'value': currentNoteId
+            };
+            paramArray.push(recordRef, noteId);
+            var cgiParam = JSON.stringify(paramArray);
+            var cgiAction = "core_COREPollReport_" + entityRef.LogicalName;
+            //debugger;
+            CORE.Services.CgiRequest(cgiAction, cgiParam, CORE.Util.pollSuccess, CORE.Util.pollFailure);
+        },
+        pollSuccess: function (result) {
+            if (result.includes('Liquid error:')) {
+                CORE.UI.showLoadingModal(false);
+                console.log("Error: Share action failure. Please review.");
+            }
+            else {
+                var id = JSON.parse(result).results[0].value;
+                //debugger;
+                if (JSON.parse(result).results[1].value) {
+                    CORE.UI.showLoadingModal(false);
+                    var url = window.location.origin + "/_entity/annotation/" + id;
+                    var myWindow = window.open(url, "_blank");
+                }
+                else {
+                    //build entity object
+                    var obj = JSON.parse(result).results[2].erefValue;
+                    var rec = {};
+                    rec.LogicalName = obj.LogicalName;
+                    rec.id = obj.Id;
+                    setTimeout(function () {
+                        //debugger;
+                        CORE.Util.downloadReport(rec, id);
+                    }, 2000);
+                }
+            }
+        },
+        pollFailure: function () {
+            //debugger;
+            CORE.UI.showLoadingModal(false);
+        },
+        /*
+         * Runs the workflow to Generate a submission report on success it will attempt to download the latest report.
+         *
+         * @param {string} submissionId - the submission id usually "{{request.params['id']}}"
+         * @param {string} workflowId - the submission report generation workflow "{{settings["CORE/GenerateSubmissionReportWorkflowId"]}}"
+         * @param {string} websiteId - the website id: "{{website.id}}"
+         * @param {string} logicalName - the Logical Name of the entity "core_submission"
+         * @param {string} currentNoteId - the current Note Id for the report - this will be update in the Generate Report workflow when completed
+         *
+         *  Dependancies: - CORE.UI - for loading modal.
+         */
+        generateReport: function (boundRecordId, workflowId, websiteId, logicalName, currentNoteId) {
+            CORE.UI.confirm("Generate preview", "Generating your preview may take a few moments. Do you wish to continue?", "Cancel", "Continue", function () {
+                CORE.UI.showLoadingModal(true);
+                var data = '{"workflow":{"LogicalName":"workflow","Id":"' + workflowId + '"},"entity":{"LogicalName":"' + logicalName + '","id":"' + boundRecordId + '"}}';
+                //debugger;
+                CORE.Services.runWorkflow(workflowId, data, function () {
+                    if (logicalName == "core_submission") {
+                        CORE.Util.downloadSubmissionReport(boundRecordId);
+                    }
+                    else {
+                        CORE.Util.downloadReport(JSON.parse(data).entity, currentNoteId);
+                    }
+                }, function () {
+                    console.log("Generate Report workflow failed to run");
+                }, websiteId);
+            });
+        },
+        /*
+         *  Attempts to download the submission report.
+         *  @param {string} submissionId - the submission id usually "{{request.params['id']}}"
+         *
+         *  Dependancies: - Report is being generated in the background.
+         *                - After Report is generated it updates core_submissionreportdraftnumber
+         *                - CORE.UI - for loading modal.
+         */
+        downloadSubmissionReport: function (submissionId) {
+            var draftNum = Number($("#core_submissionreportdraftnumber").val());
+            var downloadDoc = shell.ajaxSafePost(
+                {
+                    type: "GET",
+                    contentType: "application/json",
+                    cache: false,
+                    url: "/session/services/all-submissions/Download/?id=" + submissionId
+                }).done(function (data) {
+                    console.log("Data Length: " + data.results.length);
+                    if (data.results.length > 0) {
+                        if (draftNum + 1 === Number(data.results[0].draftNum)) {
+                            console.log("Got correct draft");
+                            // Download - 4sec
+                            setTimeout(function () {
+                                var url = window.location.origin + "/_entity/annotation/" + data.results[0].annotationid;
+                                var myWindow = window.open(url, "_blank");
+                                CORE.UI.showLoadingModal(false);
+                            }, 4000);
+                            // Increment page loaded draft number so when they click button again it should work.
+                            $("#core_submissionreportdraftnumber").val(draftNum + 1);
+                        }
+                        else {
+                            // recurse (after 1 sec) until we are downloading the correct draft. (the generate hasnt finished yet)
+                            console.log("Incorrect draft - recurse");
+                            setTimeout(function () {
+                                CORE.Util.downloadSubmissionReport(submissionId);
+                            }, 1000);
+                        }
+                    }
+                    else {
+                        console.log("No data - recurse");
+                        setTimeout(function () {
+                            CORE.Util.downloadSubmissionReport(submissionId);
+                        }, 1000);
+                    }
+                }).fail(function () {
+                    console.log("Error");
+                    CORE.UI.showLoadingModal(false);
+                });
+        },
+        /*
+         * Shows the  'Loading...' message on the subgrid - until all the folders have been created in SharePoint.
+         * Recursively calls a CRM action which returns the result of if the folder creation was completed or not.
+         *
+         * @param {string} subgrid - the subgrid id usually "{{request.params['id']}}"
+         *
+         *  Dependancies: - CORE.Services - for calling the CGI pattern to run an action.
+         */
+        WaitForFolderCreation: function (subgridname, submitbutton) {
+            CORE.Util.ShowLoadingSubgrid(subgridname, true);
+            $("#" + submitbutton).prop("disabled", true);
+            var numOfRows = $("div#" + subgridname).find("tbody > tr").length;
+            var arr = [];
+            // Get the ID of the Supporting Document entity in the Grid.    
+            $("div#" + subgridname).find("tbody > tr").each(function (i, row) {
+                // Initialise parameters to call an Action
+                var action = "core_COREGetIsSPFolderCreated";
+                var parameters = [];
+                var rowDataId = row.getAttribute("data-id");
+                var sd = {};
+                sd.LogicalName = "core_supportingdocument";
+                sd.Id = rowDataId;
+                var sdRef = {
+                    'erefValue': sd,
+                    'key': 'Suppdoc',
+                    'value': ''
+                };
+                parameters.push(sdRef);
+                CORE.Services.CgiRequest(action, JSON.stringify(parameters),
+
+                    function (data) {
+                        var results = JSON.parse(data).results;
+                        arr.push(results[0].value);
+                        if (arr.length == numOfRows) {
+                            if (arr.includes(false) == false) {
+                                console.log(subgridname + " folders exist and completed.");
+                                CORE.Util.ShowLoadingSubgrid(subgridname, false);
+                                $("#" + submitbutton).prop("disabled", false);
+                            }
+                            else {
+                                // Recurse after 1 second
+                                setTimeout(function () {
+                                    CORE.Util.WaitForFolderCreation(subgridname, submitbutton)
+                                }, 1000);
+                            }
+                        }
+                    },
+
+                    function (data) {
+                        console.log("Error: An unknown error occurred while calling action core_COREGetIsSPFolderCreated.");
+                    });
+            });
+        },
+        /*
+         * Shows or hides the 'Loading...' message on the subgrid.
+         *
+         * @param {string} subgrid - the subgrid id usually "{{request.params['id']}}"
+         * @param {bool} showhide - true to show loading message and false to hide it and return subgrid to normal.
+         */
+        ShowLoadingSubgrid: function (subgrid, showhide) {
+            if (showhide) {
+                $("div#" + subgrid).find("div[class='view-loading message text-center']").css("display", "block");
+                $("div#" + subgrid).find("tbody").css("display", "none");
+            }
+            else {
+                $("div#" + subgrid).find("div[class='view-loading message text-center']").css("display", "none");
+                $("div#" + subgrid).find("tbody").css("display", "");
+            }
+        },
+        /**
+         * Waits for an element to be present in the DOM.
+         *
+         * @param {string} selector - the JQuery selector
+         * @param {function} callback - The callback function
+         * @param {integer} n? - The timeout parameter before it stops trying.
+         */
+        WaitForElement: function (selector, callback, n) {
+            if (n == null || n == undefined) {
+                n = 1;
+            }
+            if (n <= 100) {
+                if ($(selector).length) {
+                    callback();
+                }
+                else {
+                    setTimeout(function () {
+                        CORE.Util.WaitForElement(selector, callback, n + 1);
+                    }, 100);
+                }
+            }
+            else {
+                console.log("WaitForElement timed out after 100 attempts for selector: \"" + selector + "\"");
+            }
+        },
+        /**
+         * Waits for an element to be present in the DOM of an iframe.
+         *
+         * @param {string}iframeSelectorselector - the JQuery iframe selector*
+         * @param {string} selector - the JQuery selector
+         * @param {function} callback - The callback function
+         * @param {integer} n? - The timeout parameter before it stops trying.
+         * @param {integer} delay? - The time in ms to wait each attempt.
+         * @param {integer} maxTries? - The max number of waits.
+         */
+        WaitForElementInIframe: function(iframeSelector, selector, callback, n, delay, maxTries) {
+            if (n == null || n == undefined) {
+                n = 1;
+            }
+            if (delay == null || delay == undefined) {
+                delay = 100;
+            }
+            if (maxTries == null || maxTries == undefined) {
+                maxTries = 100;
+            }
+    
+            if (n <= maxTries) {
+                if ($(iframeSelector).contents().find(selector).length) {
+                    callback();
+                }
+                else {
+                    setTimeout(function () {
+                        CORE.Util.WaitForElementInIframe(iframeSelector, selector, callback, n + 1);
+                    }, delay);
+                }
+            }
+            else {
+                console.log("WaitForElementInIframe timed out after " + maxTries + " attempts for selector: \"" + selector + "\"");
+            }
+        },
+        ClearUserContext: function (userid) {
+            CORE.Services.DisassociateSingle("contacts", userid, "doh_contextid");
+        },
+        /**
+         * Removes HTM tags from the passed text
+         * from https://css-tricks.com/snippets/javascript/strip-html-tags-in-javascript/
+         * @param {string} data - input data
+         */
+        CleanTextOfHTMLTags: function (data) {
+            return data.replace(/(<([^>]+)>)/gi, "");
+        },
+        /**
+         * Sets up auto save for the form. This relies on webapi, hence site settings must be created in the format
+         * Webapi/{entityLogicalName}/enabled with value of true
+         * Webapi/{entityLogicalName}/fields with value of *
+         * @param {string} entitySchemaName - used in webapi call, usually the plural version of the {entityLogicalName}, like contacts
+         * @param {string} recordId - used in webapi call, the guid of the record
+         * @param {string} lookupFieldValues - Required if lookup fields have to be supported, an array of objects that provide necessary information to handle lookup fields
+         * @param {string} callBackPostSave - Optional function that will be triggered once save has been completed successfully		 
+         * @param {string} autoSaveTime - Optional value to change the interval of save, default is 30 seconds
+         
+         */
+        handleAutoSave: function (entitySchemaName, recordId, lookupFieldValues, callBackPostSave, autoSaveTime) {
+            var getId = function (control) {
+                var controlType = $(control).prop('type');
+                var id = $(control).prop('id');
+                switch (controlType) {
+                    case "radio":
+                        return id.substring(0, id.lastIndexOf("_")); //Remove_0,_1 and so on
+                    case "text":
+                        if (isLookupControl(id)) {
+                            return id.replace("_name", "").replace("_entityname", ""); //Care only for the field containing the guid value
+                        }
+                        else if (isDateControl(id)) {
+                            return id.replace("_datepicker_description", ""); //Care only for the field containing the date value
+                        }
+                        else {
+                            return id;
+                        }
+                    default:
+                        return id;
+                }
+            }
+            //Care only for the guid value
+            var getLookupValue = function (id) {
+                id = id.replace("_name", "");
+                id = id.replace("_entityname", "");
+                var val = $("#" + id).val();
+                return val ? val : null;
+            }
+            //Checks if all three fields exist or not
+            var isLookupControl = function (id) {
+                id = id.replace("_name", "");
+                id = id.replace("_entityname", "");
+                var nameField = id + "_name";
+                var entityNameField = id + "_entityname";
+                return $("#" + nameField).length > 0 && $("#" + entityNameField).length > 0;
+            }
+            //Checks if description field exists or not
+            var isDateControl = function (id) {
+                id = id.replace("_datepicker_description", "");
+                var descriptionField = id + "_datepicker_description";
+                return $("#" + descriptionField).length > 0;
+            }
+            //Care only for the date value
+            var getDateValue = function (id) {
+                id = id.replace("_datepicker_description", "");
+                var val = $("#" + id).val();
+                return val ? val : null;
+            }
+            var getValue = function (control) {
+                var id = $(control).prop('id');
+                var controlType = $(control).prop('type');
+                switch (controlType) {
+                    case "radio":
+                        var name = $(control).prop('name');
+                        var val = $('input[name="' + name + '"]:checked').val();
+                        if (val === "0") {
+                            return false;
+                        }
+                        else if (val === "1") {
+                            return true;
+                        }
+                        else {
+                            return val;
+                        }
+                        break;
+                    case "select-one":
+                        return $(control).val() ? $(control).val() :
+                            null;
+                        break;
+                    case "text":
+                        if ($(control).hasClass('decimal') || $(control).hasClass('money')) {
+                            var decimalValue = $(control).val();
+                            if (decimalValue) {
+                                return parseFloat(decimalValue);
+                            }
+                            else {
+                                return null;
+                            }
+                        }
+                        else if ($(control).hasClass('integer')) {
+                            var integerValue = $(control).val();
+                            if (integerValue) {
+                                return parseInt(integerValue);
+                            }
+                            else {
+                                return null;
+                            }
+                        }
+                        else if (isLookupControl(id)) {
+                            return getLookupValue(id);
+                        }
+                        else if (isDateControl(id)) {
+                            return getDateValue(id);
+                        }
+                        else {
+                            return $(control).val();
+                        }
+                        break;
+                    default:
+                        return $(control).val();
+                }
+                return $(control).val();
+            }
+            var getFieldValues = function () {
+                var values = new Array();
+                $(document).find('input[type=radio],input[type=text],textarea,select').not(':input[readonly]').each(function () {
+                    var id = getId($(this));
+                    if (values.find(x => x.id === id) === undefined) {
+                        values.push(
+                            {
+                                id: id,
+                                type: $(this).prop('type'),
+                                value: getValue($(this))
+                            });
+                    }
+                });
+                return values;
+            }
+            var successfullSave = function () {
+                initialValues = getFieldValues(); //Reset the original values
+                console.log('Data saved at ' + new Date().toLocaleTimeString('en-AU'));
+                if (callBackPostSave) {
+                    callBackPostSave();
+                }
+            };
+            var initialValues = getFieldValues();
+            setInterval(function () {
+                var currentValues = getFieldValues();
+                var changedValues = new Array();
+                for (var i = 0; i < initialValues.length; i++) {
+                    var initialValue = initialValues[i].value;
+                    var currentValue = currentValues.find(x => x.id === initialValues[i].id).value;
+                    if (initialValue !== currentValue) {
+                        changedValues.push(currentValues[i]);
+                    }
+                }
+                if (changedValues.length > 0) {
+                    var dataToUpdate = {};
+                    for (var i = 0; i < changedValues.length; i++) {
+                        var fieldId = changedValues[i].id;
+                        if (isLookupControl(fieldId)) {
+                            if (lookupFieldValues) {
+                                if (lookupFieldValues.find(x => x.lookupFieldId === fieldId) !== undefined) {
+                                    var lookupFieldIdSchemaName = lookupFieldValues.find(x => x.lookupFieldId === fieldId).lookupFieldIdSchemaName;
+                                    var lookupFieldIdEntitySchemaName = lookupFieldValues.find(x => x.lookupFieldId === fieldId).lookupFieldIdEntitySchemaName;
+                                    if (getLookupValue(fieldId)) {
+                                        dataToUpdate[lookupFieldIdSchemaName + "@odata.bind"] = "/" + lookupFieldIdEntitySchemaName + "(" + getLookupValue(fieldId) + ")";
+                                    }
+                                    else {
+                                        CORE.Services.DisassociateSingle(entitySchemaName, recordId, lookupFieldIdSchemaName, successfullSave); //Nullify the value
+                                    }
+                                }
+                            }
+                        }
+                        else {
+                            dataToUpdate[fieldId] = changedValues[i].value;
+                        }
+                    }
+                    console.log(dataToUpdate);
+                    if (Object.keys(dataToUpdate).length > 0) {
+                        CORE.Services.UpdateRecord(entitySchemaName, recordId, dataToUpdate, successfullSave);
+                    }
+                }
+            }, autoSaveTime ? autoSaveTime : 30000) //Every 30 seconds by default
+        },
+        handleABNSearch: function (abnSearchFieldId, organisationNameFieldId) {
+            var abnSearchField = $("#" + abnSearchFieldId);
+            var organisationNameField = $("#" + organisationNameFieldId);
+            var abn = abnSearchField.val();
+            var formattedAbn = abn.replace(/\s/g, '').replace(",", "").replace(/\D+/g, '');
+            var warningPanelId = "warningPanel_NoOrg_" + abnSearchFieldId;
+            var retrieveABNSuccess = function (organisationName, isInCRM, organisationId) {
+                CORE.UI.showLoadingModal(false);
+                removeWarningPanel();
+                if (organisationName) {
+                    organisationNameField.val(organisationName);
+                }
+                else {
+                    handleNoABNMatch();
+                }
+            };
+            var retrieveABNOnFailure = function (e) {
+                console.log(e);
+                CORE.UI.showLoadingModal(false);
+                handleNoABNMatch();
+            };
+            var handleNoABNMatch = function () {
+                removeWarningPanel();
+                var htmlNoOrg = CORE.UI.createWarningElement(warningPanelId, "Unable to find an Organisation for the provided ABN.");
+                htmlNoOrg.insertBefore(abnSearchField);
+                organisationNameField.val('');
+            };
+            var removeWarningPanel = function () {
+                $("div[id='" + warningPanelId + "']").each(function (index, ele) {
+                    $(ele).remove();
+                });
+            };
+            if (formattedAbn !== "") {
+                abnSearchField.val(formattedAbn);
+                CORE.UI.showLoadingModal(true);
+                CORE.Services.GetOrganisationByABN(formattedAbn, retrieveABNSuccess, function () { }, retrieveABNOnFailure);
+            }
+            else if (abn !== "") {
+                handleNoABNMatch();
+            }
+            else {
+                organisationNameField.val('');
+            }
+        },
+        /*
+         * Retrieves the ARTG name that matches ARTG ID
+         * USED BY: - AMSHT Application
+         */
+        handleARTGSearch: function (artgSearchFieldId, artgNameFieldId, callbackForAdditionalInfo) {
+            var artgSearchField = $("#" + artgSearchFieldId);
+            var artgNameField = $("#" + artgNameFieldId);
+            var artgID = artgSearchField.val();
+            var formattedARTGID = artgID.replace(/\s/g, '').replace(",", "").replace(/\D+/g, '');
+            var infoPanelId = "infoPanel_ARTGName_" + artgSearchFieldId;
+            var warningPanelId = "warningPanel_NoARTG_" + artgSearchFieldId;
+            var getXMLValue = function (data, path) {
+                var value = data.querySelector(path);
+                if (value) {
+                    return value.textContent.replace("&amp;", "&");
+                }
+                else {
+                    return null;
+                }
+            };
+            var retrieveARTGSuccess = function (data, ARTGID) {
+                console.log(data);
+                CORE.UI.showLoadingModal(false);
+                removePanels();
+                var totalRecords = parseInt($(data).find('TotalRecords')[0].textContent) || 0;
+                var matchFound = false;
+                if (totalRecords > 0) {
+                    var licenceIdCollection = $(data).find('LicenceId:contains("' + ARTGID + '")');
+                    for (var i = 0; i < licenceIdCollection.length; i++) {
+                        var licenceIdInt = parseInt(licenceIdCollection[i].textContent) || 0;
+                        if (licenceIdInt === parseInt(ARTGID)) {
+                            matchFound = true;
+                            var productName = data.querySelector('ARTGSearchResult > Results > ARTGEntry > Name').textContent.replace("&amp;", "&");
+                            if (callbackForAdditionalInfo) {
+                                var gmdnCode = getXMLValue(data, 'ARTGSearchResult > Results > ARTGEntry > Products > Product > GMDNCode');
+                                var gmdnTerm = getXMLValue(data, 'ARTGSearchResult > Results > ARTGEntry > Products > Product > GMDNTerm');
+                                var manufacturerName = getXMLValue(data, 'ARTGSearchResult > Results > ARTGEntry > Manufacturers > Manufacturer > Name');
+
+                                var additionalInfo = {
+                                    GMDNCode: gmdnCode,
+                                    GMDNTerm: gmdnTerm,
+                                    ManufacturerName: manufacturerName,
+                                };
+                                callbackForAdditionalInfo(additionalInfo);
+                            }
+                            artgNameField.val(productName);
+                            removePanels();
+                            var htmlARTGName = CORE.UI.createSuccessPanelElement(infoPanelId, "ARTG name: " + productName);
+                            htmlARTGName.insertBefore(artgSearchField);
+                        }
+                    }
+                }
+                if (!matchFound) {
+                    handleNoARTGMatch();
+                }
+            };
+            var retrieveARTGOnFailure = function (e) {
+                console.log(e);
+                CORE.UI.showLoadingModal(false);
+                handleNoARTGMatch();
+            };
+            var handleNoARTGMatch = function () {
+                removePanels();
+                var htmlNoOrg = CORE.UI.createWarningElement(warningPanelId, "Unable to find an ARTG for the provided ARTG ID: " + artgID + ".");
+                htmlNoOrg.insertBefore(artgSearchField);
+                artgSearchField.val('');
+                artgNameField.val('');
+            };
+            var removePanels = function () {
+                $("div[id='" + infoPanelId + "']").each(function (index, ele) {
+                    $(ele).remove();
+                });
+                $("div[id='" + warningPanelId + "']").each(function (index, ele) {
+                    $(ele).remove();
+                });
+            }
+            if (formattedARTGID !== "") {
+                artgSearchField.val(formattedARTGID);
+                CORE.UI.showLoadingModal(true);
+                CORE.Services.GetARTGData(formattedARTGID, retrieveARTGSuccess, retrieveARTGOnFailure);
+            }
+            else if (artgID !== "") {
+                handleNoARTGMatch();
+            }
+            else {
+                removePanels();
+                artgNameField.val('');
+            }
+        },
+        addTextCompare: function (sourceControlId, destinationControlId, buttonText, popupHeading, contentHeading) {
+            var buttonId = 'btnDiff' + destinationControlId;
+            var diffButton = "<input type='button' value='" + buttonText + "'' onclick='' style='margin-top: 10px;' id='" + buttonId + "' class='btn btn-primary button submit-btn au-btn' />";
+            $('#' + destinationControlId).after(diffButton);
+            var confirm = function (heading, question, cancelButtonTxt, okButtonTxt, callback) {
+                // check if modal already exists
+                var confirmModal = $('#printThisId');
+                if (confirmModal.length === 0) {
+                    confirmModal = $("<div class='modal fade' id='printThisId' role='dialog'>" +
+                        "<div class='modal-dialog modal-lg'>" +
+                        "<div class='modal-content'>" +
+                        "<div class='modal-header'>" +
+                        "<h1 class='modal-title printThis'>" + heading + "</h1>" +
+                        "</div>" +
+                        "<div class='modal-body printThis'>" +
+                        "<p>" + question + "</p>" +
+                        "</div>" +
+                        "<div class='modal-footer'>" +
+                        "<button type='button' id='okButton' class='btn btn-primary au-btn' data-dismiss='modal'>" + okButtonTxt + "</button>" +
+                        "<button type='button' id='cancelButton' class='btn btn-default au-btn au-btn--secondary' data-dismiss='modal'>" + cancelButtonTxt + "</button>" +
+                        "</div>" +
+                        "</div>" +
+                        "</div>" +
+                        "</div>");
+                    confirmModal.find('#okButton').click(function (event) {
+                        callback();
+                        confirmModal.modal('hide');
+                    });
+                    confirmModal.find('#cancelButton').click(function (event) {
+                        confirmModal.modal('hide');
+                    });
+                }
+                else {
+                    confirmModal.find('.modal-header h1').html(heading);
+                    confirmModal.find('.modal-body').html("<p class='jai'>" + question + "</p>");
+                }
+                confirmModal.modal('show');
+            };
+            var printElement = function () {
+                var content = $('#printThisId .modal-header').html();
+                content += $('#printThisId .modal-body').html();
+                var w = window.open();
+                if (w !== null) {
+                    w.document.write(content);
+                    w.document.close();
+                    w.focus();
+                    w.print();
+                    w.close();
+                }
+            };
+            var getDiffHtml = function (dmp, text1, text2, type1) {
+                dmp.Diff_Timeout = 0; // A timeout of '0' allows for unlimited computation.
+                dmp.Diff_EditCost = 4; // Required for efficiency cleanup, edit cost 4
+                var d = dmp.diff_main(text1, text2);
+                if (type1 === 'semantic') {
+                    dmp.diff_cleanupSemantic(d);
+                }
+                if (type1 === 'efficiency') {
+                    dmp.diff_cleanupEfficiency(d);
+                }
+                var ds = dmp.diff_prettyHtml(d);
+                ds = ds.replace(/&para;/g, "");
+                return ds;
+            }
+            $("#" + buttonId).click(function () {
+                var dmp = new diff_match_patch();
+                if (typeof dmp !== 'undefined') {
+                    var title = popupHeading;
+                    var text1 = $('#' + sourceControlId).val();
+                    var text2 = $('#' + destinationControlId).val();
+                    var content = "<h2>" + contentHeading + "</h2>" + getDiffHtml(dmp, text1, text2, 'semantic');
+                    confirm(title, content, "Close", "Print / Save", printElement);
+                }
+            });
+        },
+        addSNOMEDAutoComplete: function (amtWebApiUrl, functionCode, azureUrl, searchFieldId, labelFieldId, codeFieldId) {
+            var settings = {
+                'AmtWebApiUrl': amtWebApiUrl,
+                'FunctionCode': functionCode,
+                'AzureAppUrl': azureUrl
+            };
+            var showSearchingPanel = function (fieldId) {
+                var panelId = "panel_Searching_" + fieldId;
+                var fieldControl = $("#" + fieldId);
+                $("div[id='" + panelId + "']").each(function (index, ele) {
+                    $(ele).remove();
+                });
+                var explanationPanel = CORE.UI.createSuccessPanelElement(panelId, "Searching... Please wait...");
+                explanationPanel.insertBefore(fieldControl);
+            };
+
+            var hideSearchingPanel = function (fieldId) {
+                var panelId = "panel_Searching_" + fieldId;
+                $("div[id='" + panelId + "']").each(function (index, ele) {
+                    $(ele).remove();
+                });
+            };
+
+            $("#" + searchFieldId).autocomplete(
+                {
+                    source: function (request, response) {
+                        showSearchingPanel(searchFieldId);
+                        var searchTerm = $("#" + searchFieldId).val();
+                        var token = top.window.CORE.Services.AmtToken;
+                        var message = 'Your search did not return any results from SNOMED CT-AU. Other condition terms may be entered.';
+                        var amtFailure = function (data) {
+                            // This will occur if the service cannot find the endpoint etc. Show error message to user
+                            showMessage("The AMT service is currently unavailable, please try again later.", "error");
+                            hideSearchingPanel(searchFieldId);
+                        };
+                        if (typeof (token) === "undefined" || token === null || (token.expires_on * 1000 < Date.now())) {
+                            var promise1 = CORE.Services.GetPortalTokenAjax();
+                            $.when(promise1).then(function (data) {
+                                var promise2 = CORE.Services.GetAzureTokenAjax(data, settings);
+                                $.when(promise2).then(function (data) {
+                                    top.window.CORE.Services.AmtToken = JSON.parse(data);
+                                    CORE.Services.GetAMTData(searchTerm, function (data) {
+                                        hideSearchingPanel(searchFieldId);
+                                        response(data);
+                                    }, amtFailure, amtWebApiUrl, top.window.CORE.Services.AmtToken.access_token, message);
+                                });
+                            });
+                        }
+                        else {
+                            CORE.Services.GetAMTData(searchTerm, function (data) {
+                                hideSearchingPanel(searchFieldId);
+                                response(data);
+                            }, amtFailure, amtWebApiUrl, token.access_token, message);
+                        }
+                    },
+                    minLength: 3,
+                    open: function () {
+                        $("ul.ui-menu").width('775px');
+                    },
+                    select: function (event, ui) {
+                        hideSearchingPanel(searchFieldId);
+                        $("#" + codeFieldId).val(ui.item.code);
+                        $("#" + labelFieldId).val(ui.item.code + "|" + ui.item.value);
+                    }
+                });
+            $("#" + searchFieldId).change(function () {
+                var item = $("#" + labelFieldId).val().split("|");
+                if ($("#" + searchFieldId).val() != item[1]) {
+                    $("#" + codeFieldId).val("");
+                }
+                else {
+                    $("#" + codeFieldId).val(item[0]);
+                }
+            });
+            CORE.UI.setFieldRowVisibility(labelFieldId, false);
+            CORE.UI.setFieldRowVisibility(codeFieldId, false);
+        },
+    }
+})();

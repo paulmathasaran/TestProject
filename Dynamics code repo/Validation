@@ -1,0 +1,2395 @@
+/*
+ * Common Health Products Portal UI library
+ */
+var CORE = CORE || {};
+CORE.UI = (function ()
+{
+	function _getValidatorId(controlIdToValidate, validatorKey)
+	{
+		return controlIdToValidate + "Validator_" + validatorKey;
+	}
+
+	function _getTextMutedElementHtml(content)
+	{
+		return "<div class='text-muted' style='position: absolute;top: 4px;'>" + content + "</div>";
+	}
+
+	function _loadEntityFormAsModal(url, modalElementId)
+	{
+		var $modal = $("#" + modalElementId);
+        var $iFrame = $modal.find("iframe");
+        $iFrame.attr("src", url);
+        $iFrame.on("load", function () {
+            $modal.find(".form-loading").hide();
+            $modal.find("iframe").contents().find("#EntityFormControl").show();
+        });
+        $modal.find(".form-loading").show();
+        $modal.find("iframe").contents().find("#EntityFormControl").hide();
+        $modal.on('show.bs.modal', function () {
+            $modal.attr("aria-hidden", "false");
+        });
+        $modal.off("hidden.bs.modal.entitygrid").on("hidden.bs.modal.entitygrid", function () {
+            $modal.attr("aria-hidden", "true");
+        });
+        $modal.modal();
+	}
+    /* ************** Public functions ************** */
+	return {
+		/*
+		 * Displays a message overlay over the entire body.
+		 * @param {string} message - The message to display.
+		 */
+		showModalOverlay: function (message)
+		{
+			message = message || "Please wait, this shouldn't take long...";
+			CORE.UI.removeCurrentModalOverlay();
+			var overlay = $(
+				"<div id='COREModalOverlay'>" +
+				"            <div>" +
+				"                          <span class='fa fa-spinner fa-spin'></span> " + message +
+				"            </div>" +
+				"</div>");
+			$("html body").append(overlay);
+		},
+		/*
+		 * Displays a loading spinner over the entire webpage
+		 * @param {boolean} show - turn on or off the loading spinner
+		 */
+		showLoadingModal: function (show)
+		{
+			if ($("#loadingModal").length == 0)
+			{
+				var loadingelement = "<div id='loadingModal' class='modal fade core-modal-lg' data-backdrop='static' data-keyboard='false' tabindex='-1'>" + "<div class='modal-dialog modal-sm' style='display: table; position: fixed; margin: 0 auto; top: calc(50% - 24px); left: calc(50% - 24px);'>" + " <span style='position: absolute;' class='fa fa-spinner fa-spin fa-5x'></span>" + "</div>" + "</div>";
+				$(loadingelement).insertAfter($("body"));
+			}
+			if (show)
+			{
+				$("#loadingModal").modal("show");
+			}
+			else
+			{
+				$("#loadingModal").modal("hide");
+			}
+		},
+		/*
+		 * Variation of showLoadingModal to be called from parent to iframe
+		 * @param {boolean} show - turn on or off the loading spinner
+		 * @param {object} iframe - the iframe container e.g $('#iframe')[0]
+		 */
+		showLoadingModalFromParent: function (show, iframe)
+		{
+			var iframe = iframe.contents();
+			if (iframe && iframe.length > 0)
+			{
+				var loadingModal = iframe.find("#loadingModalParent");
+				if (loadingModal.length == 0)
+				{
+					var loadingelement = $("<div id='loadingModalParent' class='modal fade core-modal-lg' data-backdrop='static' data-keyboard='false' tabindex='-1'>" + "<div class='modal-dialog modal-sm' style='display: table; position: fixed; margin: 0 auto; top: calc(50% - 24px); left: calc(50% - 24px);'>" + " <span style='position: absolute;' class='fa fa-spinner fa-spin fa-5x'></span>" + "</div>" + "</div>");
+					var body = iframe.find("body");
+					iframe.find("body").append(loadingelement);
+				}
+				if (show)
+				{
+					loadingModal.modal("show");
+				}
+				else
+				{
+					loadingModal.modal("hide");
+				}
+			}
+		},
+		showSuccessAlert: function (message, autoHide)
+		{
+			var $container = $(".notifications");
+			if ($container.length == 0)
+			{
+				var $pageHeader = $(".page-heading");
+				if ($pageHeader.length == 0)
+				{
+					$container = $("<div class='notifications'></div>").prependTo($("#content-container"));
+				}
+				else
+				{
+					$container = $("<div class='notifications'></div>").appendTo($pageHeader);
+				}
+			}
+			$container.find(".notification").slideUp().remove();
+			var $alert = $(
+				"<div class='notification alert alert-success success alert-dismissible' role='alert'>" +
+				"            <button type='button' class='close' data-dismiss='alert' aria-label='Close'>" +
+				"                          <span aria-hidden='true'>&times;</span>" +
+				"            </button>" + message +
+				"</div>");
+			$alert.on('closed.bs.alert', function ()
+			{
+				if ($container.find(".notification").length == 0)
+				{
+					$container.hide();
+				}
+			}).prependTo($container);
+			$container.show();
+			window.scrollTo(0, 0);
+			if (autoHide)
+			{
+				setTimeout(function ()
+				{
+					$alert.slideUp(100).remove();
+					if ($container.find(".notification").length == 0)
+					{
+						$container.hide();
+					}
+				}, 5000);
+			}
+		},
+		/*
+		 * Show error/warning message. Sample usage: CORE.UI.showMessage($(".notifications"), "My Test warning", "warning")
+		 * @param {object} container - jQuery object.
+		 * @param {string} message - error/warning message text
+		 * @param {string} errorType - message  type: error|warning|information
+		 */
+		showMessage: function (container, message, errorType)
+		{
+			if (errorType == "warning")
+			{
+				container.prepend('<div class="alert alert-warning text-left alert-dismissible abn" role="alert"><a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>' + message + '</div>');
+			}
+			else if (errorType == "error")
+			{
+				container.prepend('<div class="alert alert-error alert-danger text-left alert-dismissible abn" role="alert"><a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>' + message + '</div>');
+			}
+			else if (errorType == "information")
+			{
+				container.prepend('<div class="alert alert-info clearfix"><span class="fa fa-exclamation-circle" aria-hidden="true"></span> <span class="xrm-editable-text xrm-attribute"><span class="xrm-attribute-value-encoded xrm-attribute-value">' + message + '</span></span></div>');
+			}
+			window.scrollTo(0, 0);
+		}, //showMessage
+		removeCurrentModalOverlay: function ()
+		{
+			$("#COREModalOverlay").remove();
+		},
+		confirmOkOnly: function (heading, question, okButtonTxt)
+		{
+			var confirmModal = $("<div class='modal fade' id='myModal' role='dialog'>" +
+				"<div class='modal-dialog modal-lg'>" +
+				"<div class='modal-content'>" +
+				"<div class='modal-header'>" +
+				"<h1 class='modal-title'>" + heading + "</h1>" +
+				"</div>" +
+				"<div class='modal-body'>" +
+				"<p>" + question + "</p>" +
+				"</div>" +
+				"<div class='modal-footer'>" +
+				"<button type='button' id='okButton' class='btn btn-primary au-btn' data-dismiss='modal'>" + okButtonTxt + "</button>" +
+				"</div>" +
+				"</div>" +
+				"</div>" +
+				"</div>");
+			confirmModal.find('#okButton').click(function (event)
+			{
+				confirmModal.modal('hide');
+				//window.location.href='~/SignIn';
+			});
+			confirmModal.modal('show');
+		},
+		confirmOkOnlyCallback: function (heading, question, okButtonTxt, callback)
+		{
+			var confirmModal = $("<div class='modal fade' id='myModal' role='dialog'>" +
+				"<div class='modal-dialog modal-lg'>" +
+				"<div class='modal-content'>" +
+				"<div class='modal-header'>" +
+				"<h1 class='modal-title'>" + heading + "</h1>" +
+				"</div>" +
+				"<div class='modal-body'>" +
+				"<p>" + question + "</p>" +
+				"</div>" +
+				"<div class='modal-footer'>" +
+				"<button type='button' id='okButton' class='btn btn-primary au-btn' data-dismiss='modal'>" + okButtonTxt + "</button>" +
+				"</div>" +
+				"</div>" +
+				"</div>" +
+				"</div>");
+			confirmModal.find('#okButton').click(function (event)
+			{
+				callback();
+				confirmModal.modal('hide');
+			});
+			confirmModal.modal('show');
+		},
+		confirm: function (heading, question, cancelButtonTxt, okButtonTxt, callback)
+		{
+			var confirmModal = $("<div class='modal fade' id='myModal' role='dialog'>" +
+				"<div class='modal-dialog modal-lg'>" +
+				"<div class='modal-content'>" +
+				"<div class='modal-header'>" +
+				"<h1 class='modal-title'>" + heading + "</h1>" +
+				"</div>" +
+				"<div class='modal-body'>" +
+				"<p>" + question + "</p>" +
+				"</div>" +
+				"<div class='modal-footer'>" +
+				"<button type='button' id='okButton' class='btn btn-primary au-btn' data-dismiss='modal'>" + okButtonTxt + "</button>" +
+				"<button type='button' class='btn btn-default au-btn au-btn--secondary' data-dismiss='modal'>" + cancelButtonTxt + "</button>" +
+				"</div>" +
+				"</div>" +
+				"</div>" +
+				"</div>");
+			setTimeout(function ()
+			{
+				$("#okButton").focus();
+			}, 200);
+			confirmModal.find('#okButton').click(function (event)
+			{
+				callback();
+				confirmModal.modal('hide');
+			});
+			confirmModal.modal('show');
+		},
+		// Modal popup with additional Continue/Cancel confirmation.        
+		// modalCont - jquery reference to modal dialog (usually section), callback - function to execute when Continue is selected
+		// Sample:     CORE.UI.confirmModalClose($("section[aria-label='Upload / Edit']"), function(){ alert('!!!!'); });
+		confirmModalClose: function (modalCont, callback)
+		{
+			var closeButton = modalCont.find("button[aria-label='Close']");
+			closeButton.click(function ()
+			{
+				modalCont.attr('data-close-allowed', 'false');
+			})
+			modalCont.on("show.bs.modal", function ()
+			{
+				modalCont.attr('data-close-allowed', 'true');
+			});
+			modalCont.on("hide.bs.modal", function (modalRef)
+			{
+				var closeAllowed = (modalCont.attr('data-close-allowed') == 'true');
+				if (!closeAllowed)
+				{
+					// Display Confirmation Message
+					CORE.UI.confirmExtended("Cancel confirmation",
+						"Unsaved changes may be lost. Do you wish to continue?",
+						"Cancel",
+						"Continue",
+
+					function ()
+					{
+						callback();
+						// Close modal dialog
+						modalCont.attr('data-close-allowed', 'true');
+						modalCont.modal('hide');
+					}, function ()
+					{
+						modalCont.attr('data-close-allowed', 'true');
+						return true;
+					});
+					// Prevent modal dialog from closing until confirmed
+					//modalRef.preventDefault();
+					return false;
+				}
+			});
+		},
+		// Extended modal confirm. Include Continue and Cancel callbacks.
+		confirmExtended: function (heading, question, cancelButtonTxt, okButtonTxt, callback, callbackCancel)
+		{
+			var confirmModal = $("<div class='modal fade' id='myModal' role='dialog' data-backdrop='static'>" +
+				"<div class='modal-dialog modal-lg'>" +
+				"<div class='modal-content'>" +
+				"<div class='modal-header'>" +
+				"<h1 class='modal-title'>" + heading + "</h1>" +
+				"</div>" +
+				"<div class='modal-body'>" +
+				"<p>" + question + "</p>" +
+				"</div>" +
+				"<div class='modal-footer'>" +
+				"<button type='button' id='okButton' class='btn btn-primary au-btn' data-dismiss='modal'>" + okButtonTxt + "</button>" +
+				"<button type='button' id='cancelButton' class='btn btn-default au-btn au-btn--secondary' data-dismiss='modal'>" + cancelButtonTxt + "</button>" +
+				"</div>" +
+				"</div>" +
+				"</div>" +
+				"</div>");
+			setTimeout(function ()
+			{
+				$("div#myModal.fade.in #okButton").focus(); // this is the active modal dialog of Validation Errors
+			}, 200);
+			confirmModal.find('#okButton').click(function (event)
+			{
+				callback();
+				confirmModal.modal('hide');
+			});
+			confirmModal.find('#cancelButton').click(function (event)
+			{
+				callbackCancel();
+				confirmModal.modal('hide');
+			});
+			confirmModal.modal('show');
+		},
+		focusDiv: function (divId)
+		{
+			$("#" + divId).attr("tabindex", 0).focus();
+		},
+		//modalElementId:		ID of the element representing the modal dialog.
+		loadEntityFormAsModal: function (modalElementId, recordId, entityFormId, additionalQuery)
+		{
+			//Code adapted from entityGrid.prototype.addDetailsActionLinkClickEventHandlers in TGA.CFCore.Portal\js\entity-grid.js.
+			var url = CORE.Util.formatString("/_portal/modal-form-template-path/{portalId}?id={recordId}&entityformid={entityFormId}&{additionalQuery}",
+			{
+				"portalId": "6001ce4a-5ec6-ed11-b597-002248926dc4",
+				"recordId": recordId,
+				"entityFormId": entityFormId,
+				"additionalQuery": additionalQuery
+			});
+			_loadEntityFormAsModal(url, modalElementId);
+		},
+		// eg /_portal/modal-form-template-path/2ab10dab-d681-4911-b881-cc99413f07b6?entityformid=1a366b10-a5ce-e911-a863-000d3a6a4183&languagecode=1033&refentity=dohphn_activityworkplan&refid=971388c9-3ece-e911-a866-000d3a6a4119&refrel=dohphn_activityworkplan_dohphn_movementoffundscarryoverrequest';
+		loadCreateEntityFormAsModal: function (modalElementId, entityFormId, referenceEntityName, referenceEntityId, referenceRelationshipName)
+		{
+			//Code adapted from entityGrid.prototype.addDetailsActionLinkClickEventHandlers in TGA.CFCore.Portal\js\entity-grid.js.
+			var url = CORE.Util.formatString("/_portal/modal-form-template-path/{portalId}?entityformid={entityFormId}&refentity={referenceEntityName}&refid={referenceEntityId}&refrel={referenceRelationshipName}",
+			{
+				"portalId": "6001ce4a-5ec6-ed11-b597-002248926dc4",
+				"referenceEntityName": referenceEntityName,
+				"entityFormId": entityFormId,
+				"referenceEntityId": referenceEntityId,
+				"referenceRelationshipName": referenceRelationshipName
+			});
+			_loadEntityFormAsModal(url, modalElementId);
+		},
+		/*When a field is read-only on the CRM form, ADX includes a <div class='text-muted'/> element
+        that has an em-dash. ADX does not render this element however if the field is not read-only on the CRM form.
+        Use this method to create this element for the specified field.
+
+        fieldType:                         Indicates the type of the specified field. Valid values are: lookup. If this parameter is not specified, the field is assumed to be a text field.
+        */
+		setReadOnlyFieldInnerHtml: function (fieldId, html, ensureTextMutedElement, fieldType)
+		{
+			var cleanedFieldId = fieldId;
+			if (fieldType == "lookup")
+			{
+				cleanedFieldId = fieldId + "_name";
+			}
+			if (ensureTextMutedElement)
+			{
+				var $field = $("#" + cleanedFieldId);
+				if ($field.next("div.text-muted").length == 0)
+				{
+					$(_getTextMutedElementHtml("&mdash;")).insertAfter($field);
+					$field.parent().css("position", "relative");
+				}
+			}
+			$("#" + cleanedFieldId + "+.text-muted").html(html);
+		},
+		/*controlType:   Indicates the type of UI control for the field. Valid values are: radio. If this parameter is not specified, the control type
+                                                               is treated as textbox.
+                         If errorText=null then this function use Label of the field to generate errorText.
+        */
+		setFieldMandatory: function (fieldId, isMandatory, errorText, controlType)
+		{
+			CORE.UI.setFieldMandatoryWithGroup(fieldId, isMandatory, errorText, controlType, null, false);
+		},
+		setFieldMandatoryWithGroup: function (fieldId, isMandatory, errorText, controlType, groupName, addAsFirst)
+		{
+			CORE.UI.setFieldMandatoryIndicator(fieldId, isMandatory);
+			if (isMandatory)
+			{
+				var validatorEvalFunc;
+				if (errorText == null || errorText == "")
+				{
+					var fieldLabel = fieldId;
+					if ($("#" + fieldId)[0].getAttribute("aria-labelledby") != null)
+					{
+						fieldLabel = document.getElementById($("#" + fieldId)[0].getAttribute("aria-labelledby")).innerText;
+					}
+					else
+					{
+						fieldLabel = $("#" + fieldId + "_label")[0].innerText;
+					}
+					errorText = fieldLabel + " is required";
+				}
+				if (controlType == "radio")
+				{
+					validatorEvalFunc = function ()
+					{
+						return $("input[id^='" + fieldId + "_']:checked").length > 0;
+					};
+				}
+				else if (controlType == "checkbox")
+				{
+					validatorEvalFunc = function ()
+					{
+						return $("input[id^='" + fieldId + "']:checked").length > 0;
+					};
+				}
+				else
+				{
+					validatorEvalFunc = function ()
+					{
+						var fieldValue = $("#" + fieldId).val();
+						return fieldValue != null && fieldValue.trim() != "";
+					};
+				}
+				CORE.UI.removeValidator(fieldId, "mandatory"); //Remove first to ensure that we don't have duplicate validators on the same field
+				if (groupName)
+				{
+					CORE.UI.addValidator(fieldId, errorText, validatorEvalFunc, "mandatory", groupName, addAsFirst);
+				}
+				else
+				{
+					CORE.UI.addValidator(fieldId, errorText, validatorEvalFunc, "mandatory");
+				}
+			}
+			else
+			{
+				if (groupName)
+				{
+					CORE.UI.removeValidator(fieldId, "mandatory", groupName);
+				}
+				else
+				{
+					CORE.UI.removeValidator(fieldId, "mandatory");
+				}
+			}
+		},
+		setFieldMandatoryIndicator: function (fieldId, isMandatory)
+		{
+			$("#" + fieldId + "_label").parent().toggleClass("required", isMandatory);
+		},
+		setFieldLabel: function (fieldId, label)
+		{
+			$("#" + fieldId + "_label").text(label);
+		},
+		clearOptionSetRadioFieldValue: function (fieldId)
+		{
+			$("#" + fieldId + " > input[type='radio']").prop("checked", false);
+		},
+		clearLookupFieldValue: function (fieldId)
+		{
+			//Invoke the click event on the clear button of the lookup
+			$("#" + fieldId).nextAll(".input-group-btn:first").children(".clearlookupfield").click();
+			$("#" + fieldId).val("");
+			$("#" + fieldId + "_name").val("");
+			$("#" + fieldId).nextAll(".input-group-btn:first").children(".clearlookupfield").hide();
+		},
+		clearDateFieldValue: function (fieldId)
+		{
+			$("#" + fieldId).next().data("DateTimePicker").date(null);
+		},
+		isLookupField: function (fieldId)
+		{
+			return $("#" + fieldId + "_name.lookup").length == 1;
+		},
+		isLookupFieldReadOnly: function (fieldId)
+		{
+			var nameFieldId = fieldId + "_name";
+			return $("#" + nameFieldId).prop("disabled");
+		},
+		/*
+		 * After we set a look up field as readonly on the CRM form, it will become readonly on the portal too. But the detaul style is a bit off so we can use this function to style it better
+		 */
+		setStyleForReadOnlyLookupField: function (fieldId)
+		{
+			var nameFieldId = fieldId + "_name";
+			$("#" + nameFieldId).css("opacity", 0.8);
+			$("#" + nameFieldId).css('border', 'none');
+			$("#" + nameFieldId).css('padding-left', 0);
+			$("#" + nameFieldId).css('padding-right', 0);
+		},
+		/*ensureTextMutedElement:                                  Optional. When a lookup field does not have any value on load, ADX includes a <div class='text-muted'/> element
+                                                                                                                                    that has an em-dash. This element is then shown when the field is in read-only mode. ADX does not render this
+                                                                                                                                    element however if the field initially had a value. Specifies true for this parameter to create this element
+                                                                                                                                    if it does not exist.
+
+        useDisabledStylingWhenReadOnly:                       Optional. By default the field will display an em-dash and the lookup controls
+                                                                                                                                    will be hidden when readOnly is true. Specifies true for this parameter to have the field
+                                                                                                                                    appears as disabled (greyed out) and the lookup controls visible (but disabled) instead.
+
+        hideTextMutedElement:                                                       Optional. Hide the text-muted element in read-only mode if it exists.
+        */
+		setLookupFieldReadOnly: function (fieldId, readOnly, ensureTextMutedElement, useDisabledStylingWhenReadOnly, hideTextMutedElement)
+		{
+			var nameFieldId = fieldId + "_name";
+			var $nameField = $("#" + nameFieldId);
+			$nameField.prop("disabled", readOnly);
+			if (readOnly)
+			{
+				if (useDisabledStylingWhenReadOnly)
+				{
+					this.setLookupFieldLookupControlsEnabled(fieldId, false, true);
+					$nameField.addClass("disabled");
+				}
+				else
+				{
+					$nameField.removeClass("disabled");
+					$("#" + nameFieldId + " ~ .input-group-btn").hide();
+				}
+				if (ensureTextMutedElement)
+				{
+					var field = $("#" + fieldId);
+					if (field.prev("div.text-muted").length == 0)
+					{
+						$(_getTextMutedElementHtml("&mdash;")).insertBefore(field);
+					}
+				}
+				if (hideTextMutedElement)
+				{
+					$nameField.addClass("noTextMuted");
+				}
+				else
+				{
+					$nameField.removeClass("noTextMuted");
+				}
+			}
+			else
+			{
+				this.setLookupFieldLookupControlsEnabled(fieldId, true, true);
+				$nameField.removeClass("disabled");
+				$("#" + nameFieldId + " ~ .input-group-btn").show();
+			}
+		},
+		//Sets the button that launches the lookup dialog and the button that clears the lookup field enabled or disabled.
+		setLookupFieldLookupControlsEnabled: function (fieldId, enabled, addDisabledClassWhenDisabled)
+		{
+			var entityNameFieldId = fieldId + "_entityname";
+			var clearLookupFieldButton = $("#" + entityNameFieldId + " + .input-group-btn > .clearlookupfield");
+			var launchEntityLookupButton = $("#" + entityNameFieldId + " + .input-group-btn > .launchentitylookup");
+			clearLookupFieldButton.prop("disabled", !enabled);
+			launchEntityLookupButton.prop("disabled", !enabled);
+			if (enabled)
+			{
+				clearLookupFieldButton.removeClass("disabled");
+				launchEntityLookupButton.removeClass("disabled");
+			}
+			else
+			{
+				if (addDisabledClassWhenDisabled)
+				{
+					clearLookupFieldButton.addClass("disabled");
+					launchEntityLookupButton.addClass("disabled");
+				}
+			}
+		},
+		/*valueObject:                Should contain Id and Name properties.*/
+		setLookupFieldValue: function (fieldId, valueObject, entityName)
+		{
+			$("#" + fieldId).val(valueObject == null ? "" : valueObject.Id);
+			$("#" + fieldId + "_name").val(valueObject == null ? "" : valueObject.Name);
+			$("#" + fieldId + "_entityname").val(entityName == null ? "" : entityName);
+		},
+		setLookupFieldNameValue: function (fieldId, valueObjectId, valueObjectName, entityName)
+		{
+			if (valueObjectId != null && valueObjectId != "")
+			{
+				$("#" + fieldId).val(valueObjectId == null ? "" : valueObjectId);
+				$("#" + fieldId + "_name").val(valueObjectName == null ? "" : valueObjectName);
+				$("#" + fieldId + "_entityname").attr("value", entityName == null ? "" : entityName);
+			}
+		},
+		setTextMutedVisibleForLookupField: function (fieldId, textMutedVisible)
+		{
+			var $field = $("#" + fieldId + "_name");
+			if (textMutedVisible)
+			{
+				$field.removeClass("noTextMuted");
+			}
+			else
+			{
+				$field.addClass("noTextMuted");
+			}
+		},
+		changeLookupFieldLookupColumnLabel: function (fieldId, currentColumnLabel, newColumnLabel)
+		{
+			var matchingLookupColumnLink = $("#" + fieldId + "_lookupmodal div.view-grid th a").filter(function (index, element)
+			{
+				return $(element).attr("aria-label") == currentColumnLabel;
+			});
+			if (matchingLookupColumnLink.length == 1)
+			{
+				var $lookupColumnLink = $(matchingLookupColumnLink[0]);
+				$lookupColumnLink.attr("aria-label", newColumnLabel);
+				$lookupColumnLink.html($lookupColumnLink.html().replace(currentColumnLabel, newColumnLabel));
+			}
+		},
+		/*Sets field read-only and prevent it from being submitted. Use setDropDownFieldReadOnlyWithSubmit instead if you want the field to be submitted.*/
+		setDropDownFieldReadOnly: function (fieldId, readOnly)
+		{
+			var $field = $("#" + fieldId);
+			if (readOnly)
+			{
+				$field.addClass("readonly");
+			}
+			else
+			{
+				$field.removeClass("readonly");
+			}
+			$field.prop("disabled", readOnly);
+		},
+		/*Sets field read-only but does not prevent it from being submitted. Use setDropDownFieldReadOnly instead if you do not want the field to be submitted.*/
+		setDropDownFieldReadOnlyWithSubmit: function (fieldId, readOnly)
+		{
+			var $field = $("#" + fieldId);
+			$field.css("visibility", readOnly ? "hidden" : "");
+			if (readOnly)
+			{
+				var $textMutedElement = $field.next("div.text-muted");
+				if ($textMutedElement.length == 0)
+				{
+					$textMutedElement = $(_getTextMutedElementHtml("&mdash;")).insertAfter($field);
+					$field.parent().css("position", "relative");
+				}
+				$textMutedElement.addClass("forReadOnlySubmitField");
+			}
+			else
+			{
+				$field.next("div.text-muted").removeClass("forReadOnlySubmitField");
+			}
+		},
+		/*Sets field read-only but display as disabled but does not prevent it from being submitted. Use setFieldReadOnly instead if you do not want the field to be submitted.*/
+		setFieldReadOnlyWithDisabledLookWithSubmit: function (fieldId, readOnly)
+		{
+			var $field = $("#" + fieldId);
+			$field.prop("readonly", readOnly);
+			$field.css(
+			{
+				"cursor": "not-allowed",
+				"opacity": ".3"
+			});
+			if (readOnly)
+			{
+				$field.addClass("submit noTextMuted");
+			}
+			else
+			{
+				$field.removeClass("submit noTextMuted");
+			}
+		},
+		/*Sets field read-only but does not prevent it from being submitted. Use setFieldReadOnly instead if you do not want the field to be submitted.*/
+		setFieldReadOnlyWithSubmit: function (fieldId, readOnly)
+		{
+			var $field = $("#" + fieldId);
+			$field.prop("readonly", readOnly);
+			if (readOnly)
+			{
+				$field.addClass("submit noTextMuted");
+			}
+			else
+			{
+				$field.removeClass("submit noTextMuted");
+			}
+		},
+		/*Sets field read-only and prevent it from being submitted. Use setFieldReadOnlyWithSubmit instead if you want the field to be submitted.*/
+		setFieldReadOnly: function (fieldId, readOnly)
+		{
+			var $field = $("#" + fieldId);
+			$field.prop("readonly", readOnly);
+			$field.prop("disabled", readOnly);
+			$("input[id*='" + fieldId + "']").attr("readonly", readOnly);
+			$("input[id*='" + fieldId + "']").attr("disabled", readOnly);
+		},
+		/*Use this for complex controls like datetime and amount*/
+		setFieldReadOnlyForComplexControl: function (fieldId, readOnly)
+		{
+			var $field = $("#" + fieldId);
+			$field.prop("readonly", readOnly);
+			$("input[id*='" + fieldId + "']").attr("readonly", readOnly);
+		},
+		/*Use this for complex controls like datetime and amount*/
+		setRadioButtonReadOnly: function (fieldName, readOnly)
+		{
+			$(':radio[name*="' + fieldName + '"]:not(:checked)').attr('disabled', readOnly);
+		},
+		createSuccessPanelElement: function (panelId, titleHeading, content, noBottomMargin, additionalStyles)
+		{
+			var html = CORE.Util.formatString(
+				"<div id='{panelId}' class='message alert alert-info success alert alert-success {noBottomMarginClass}' {styles} role='alert' aria-label='{titleHeading}'>" +
+				"            <h3 class='panel-title'>" +
+				"                          <span class='fa fa-check-circle' aria-hidden='true'></span> {titleHeading}" +
+				"            </h3>" +
+				"            {content}" +
+				"</div>",
+			{
+				panelId: panelId,
+				titleHeading: titleHeading,
+				content: content == null ? "" : content,
+				noBottomMarginClass: noBottomMargin ? "noBottomMargin" : "",
+				styles: additionalStyles != null && additionalStyles != "" ? "style='" + additionalStyles + "'" : ""
+			});
+			return $(html);
+		},
+		createErrorPanelElement: function (panelId, titleHeading, content, noBottomMargin)
+		{
+			var html = CORE.Util.formatString(
+				"<div id='{panelId}' class='alert alert-error alert-danger alert-block {noBottomMarginClass}' role='alert' aria-label='{titleHeading}'>" +
+				"            <h4 class='validation-header'>" +
+				"                          <span role='presentation' class='fa fa-info-circle'></span> {titleHeading}" +
+				"            </h4>" +
+				"            {content}" +
+				"</div>",
+			{
+				panelId: panelId,
+				titleHeading: titleHeading,
+				content: content == null ? "" : content,
+				noBottomMarginClass: noBottomMargin ? "noBottomMargin" : ""
+			});
+			return $(html);
+		},
+		createFieldExplanationElement: function (elementId, content)
+		{
+			var html = CORE.Util.formatString(
+				"<div id='{elementId}' class='fieldExplanation'>{content}</div>",
+			{
+				elementId: elementId,
+				content: content
+			});
+			return $(html);
+		},
+		createWarningElement: function (elementId, content)
+		{
+			var html = CORE.Util.formatString(
+				"<div id='{elementId}' class='alert alert-warning'>{content}</div>",
+			{
+				elementId: elementId,
+				content: content
+			});
+			return $(html);
+		},
+		setFormSectionVisibility: function (sectionName, isVisible)
+		{
+			var $sectionFieldset = $("table[data-name='" + sectionName + "']").parent();
+			if (isVisible)
+			{
+				$sectionFieldset.show();
+			}
+			else
+			{
+				$sectionFieldset.hide();
+			}
+		},
+		setFormTabVisibility: function (tabName, isVisible)
+		{
+			var $tabControl = $("div[data-name='" + tabName + "']");
+			if (isVisible)
+			{
+				$tabControl.show();
+				$tabControl.prev().show();
+			}
+			else
+			{
+				$tabControl.hide();
+				$tabControl.prev().hide();
+			}
+		},
+		//Sets the visibility of the section's content without impacting the section's label/instruction. 
+		setFormSectionContentVisibility: function (sectionName, isVisible)
+		{
+			var $sectionTable = $("table[data-name='" + sectionName + "']");
+			if (isVisible)
+			{
+				$sectionTable.show();
+			}
+			else
+			{
+				$sectionTable.hide();
+			}
+		},
+		setFieldRowVisibility: function (fieldName, isVisible)
+		{
+			//Most, but not all fields are rendered within a div, within a td, within a tr. Go up the DOM until we have found a tr.
+			var $fieldElement = $("#" + fieldName);
+			var $fieldRow = $fieldElement.parent();
+			//A field may span multiple rows, if so also set the visibility of those rows.
+			var rowSpan = 1;
+			while (!$fieldRow.is("tr") && $fieldRow[0] != null)
+			{
+				if ($fieldRow.is("td.form-control-cell"))
+				{
+					rowSpan = $fieldRow.prop("rowspan");
+				}
+				$fieldRow = $fieldRow.parent();
+			}
+			var $nextRow = null;
+			if (rowSpan > 1)
+			{
+				$nextRow = $fieldRow.next();
+			}
+			if (isVisible)
+			{
+				$fieldRow.show();
+				for (var i = 1; i < rowSpan; i++)
+				{
+					$nextRow.show();
+					$nextRow = $nextRow.next();
+				}
+			}
+			else
+			{
+				$fieldRow.hide();
+				for (var i = 1; i < rowSpan; i++)
+				{
+					$nextRow.hide();
+					$nextRow = $nextRow.next();
+				}
+			}
+		},
+		setWebResourceFieldSetVisibility: function (webResourceName, isVisible)
+		{
+			var $webResourceFieldSet = $("#" + webResourceName).closest("fieldset");
+			if (isVisible)
+			{
+				$webResourceFieldSet.show();
+			}
+			else
+			{
+				$webResourceFieldSet.hide();
+			}
+		},
+		setWebResourceRowVisibility: function (webResourceName, isVisible)
+		{
+			//Web resources are rendered within a div, within a td, within a tr.
+			var $webResourceRow = $("#" + webResourceName).parent().parent().parent();
+			if (isVisible)
+			{
+				$webResourceRow.show();
+			}
+			else
+			{
+				$webResourceRow.hide();
+			}
+		},
+		setWebResourceCellVisibility: function (webResourceName, isVisible)
+		{
+			//Web resources are rendered within a div, within a td.
+			var $webResourceCell = $("#" + webResourceName).parent().parent();
+			if (isVisible)
+			{
+				$webResourceCell.show();
+			}
+			else
+			{
+				$webResourceCell.hide();
+			}
+		},
+		extendWebFormClientValidateFunction: function (funcToExecute)
+		{
+			var originalFunction = webFormClientValidate;
+			webFormClientValidate = function ()
+			{
+				if (originalFunction != null)
+				{
+					var isValid = originalFunction();
+					if (!isValid)
+					{
+						return false;
+					}
+				}
+				return funcToExecute();
+			};
+		},
+		applyValidator: function (validationField, validatorId, group)
+		{
+			if (typeof (Page_Validators) == "undefined")
+			{
+				return true;
+			}
+			var i;
+			for (i = 0; i < Page_Validators.length; i++)
+			{
+				if (Page_Validators[i].id == _getValidatorId(validationField, validatorId))
+				{
+					ValidatorValidate(Page_Validators[i], group, null);
+					ValidationSummaryOnSubmit(group);
+				}
+			}
+		},
+		addValidator: function (controlIdToValidate, errorText, evaluationFunction, validatorKey, validatorGroup, addAsFirstValidator, addInLine)
+		{
+			//Page_Validators will be undefined when the page is not in edit mode.
+			if (typeof (Page_Validators) == "undefined")
+			{
+				return;
+			}
+			//https://community.adxstudio.com/products/adxstudio-portals/documentation/configuration-guide/entity-form/attributes-and-relationships/custom-javascript/
+			var validator = document.createElement("span");
+			validator.style.display = "none";
+			validator.id = _getValidatorId(controlIdToValidate, validatorKey);
+			validator.controltovalidate = controlIdToValidate;
+			validator.errormessage = CORE.Util.formatString(
+				"<a href='#{controlIdToValidate}_label' onclick='javascript:CORE.UI.focusField(\"{controlIdToValidate}_label\", \"{controlIdToValidate}\"); return false;'>{errorText}</a>",
+			{
+				controlIdToValidate: controlIdToValidate,
+				errorText: errorText
+			});
+			validator.validationGroup = validatorGroup;
+			validator.initialvalue = "";
+			validator.evaluationfunction = evaluationFunction;
+			if (addInLine)
+			{
+				validator.validateInLine = true;
+			}
+			if (addAsFirstValidator)
+			{
+				Page_Validators.unshift(validator);
+			}
+			else
+			{
+				Page_Validators.push(validator);
+			}
+		},
+		focusField: function (fieldLabel, fieldId)
+		{
+			var field = $("#" + fieldId);
+			if (field != null && !field.is(":visible"))
+			{
+				var tabDiv = field.closest(".tab")
+				if (tabDiv.length > 0)
+				{
+					tabDiv.show();
+					if ($(tabDiv).attr("collapseId") != null)
+					{
+						$("#" + $(tabDiv).attr("collapseId")).click();
+					}
+				}
+			}
+			if (fieldLabel == null || $("#" + fieldLabel).length == 0) fieldLabel = "";
+			if (fieldLabel != "" && $("[aria-labelledby='" + fieldLabel + "']").length > 0)
+			{
+				$("[aria-labelledby='" + fieldLabel + "']").focus();
+			}
+			else
+			{
+				if ($("#" + fieldId).hasClass("subgrid") || $("#" + fieldId + "_0").length > 0)
+				{
+					$("#" + fieldId).attr("tabindex", 0).focus();
+				}
+				else
+				{
+					scrollToAndFocus(fieldLabel, fieldId);
+				}
+			}
+		},
+		removeValidator: function (controlIdToValidate, validatorKey)
+		{
+			//Page_Validators will be undefined when the page is not in edit mode.
+			if (typeof (Page_Validators) == "undefined")
+			{
+				return;
+			}
+			var validatorId = _getValidatorId(controlIdToValidate, validatorKey);
+			Page_Validators = $.grep(Page_Validators, function (v)
+			{
+				return v.id !== validatorId;
+			});
+		},
+		setRequiredFieldValidatorErrorMessage: function (fieldId, errorMessage)
+		{
+			if (Page_Validators == null)
+			{
+				return;
+			}
+			var validatorId = "RequiredFieldValidator" + fieldId;
+			for (var i = 0; i < Page_Validators.length; i++)
+			{
+				if (Page_Validators[i].id == validatorId)
+				{
+					var index1 = Page_Validators[i].errormessage.indexOf(">");
+					var index2 = Page_Validators[i].errormessage.indexOf("</");
+					var startString = Page_Validators[i].errormessage.substring(0, index1 + 1);
+					var endString = Page_Validators[i].errormessage.substring(index2);
+					Page_Validators[i].errormessage = startString + errorMessage + endString;
+					return;
+				}
+			}
+		},
+		fadeInThenRemove: function (element)
+		{
+			$(element).fadeIn(600, function ()
+			{
+				setTimeout(function ()
+				{
+					$(element).fadeOut(1200,
+
+					function ()
+					{
+						$(element).remove();
+					});
+				}, 3000);
+			});
+		},
+		fadeOutThenRemove: function (element, fadeOutDuration)
+		{
+			var fadeOutTime = fadeOutDuration == null ? 400 : fadeOutDuration;
+			$(element).fadeOut(fadeOutTime),
+
+			function ()
+			{
+				$(element).remove();
+			}
+		},
+		setCheckboxFieldValue: function (fieldId, checked)
+		{
+			var field = $("#" + fieldId)[0];
+			if (field != null)
+			{
+				field.checked = checked;
+			}
+		},
+		setRadioFieldChecked: function (fieldId, fieldValueToCheck)
+		{
+			var selector = CORE.Util.formatString("input:radio[id^='{fieldId}'][value='{valueToCheck}']",
+			{
+				fieldId: fieldId,
+				valueToCheck: fieldValueToCheck
+			});
+			$(selector).prop("checked", true);
+		},
+		//remove Text Muted element so that "-" is removed from ReadOnly field
+		removeTextMutedElementHtml: function (fieldId)
+		{
+			$(fieldId).next("div.text-muted").remove();
+		},
+		//Select column width of a table 
+		//tableDataName = table[data-name='tabFinancialImplication_secNetCostToGovt']
+		//first ColumnNumber = 0
+		//widthStyle = "width:5%"
+		setWidthOfTable: function (tableDataName, columnNumber, widthStyle)
+		{
+			// Change Events
+			var netCostToGovtTable = $(tableDataName);
+			if (netCostToGovtTable != null && netCostToGovtTable.length > 0)
+			{
+				NodeList.prototype.forEach = Array.prototype.forEach;
+				netCostToGovtTable[0].childNodes.forEach(function (curChildNode)
+				{
+					if (curChildNode.tagName.toUpperCase() == "COLGROUP")
+					{
+						netCostToGovtTable[0].childNodes[0].childNodes[columnNumber].style = widthStyle;
+					}
+				});
+			}
+		},
+		setupExpandableTab: function (tabDisplayName, tabName, expandbyDefault)
+		{
+			var tabHeadingControl = "h2:contains('" + tabDisplayName + "')";
+			if (tabHeadingControl != null)
+			{
+				var accordionId = "accId_" + tabName;
+				var tabDataName = "div[data-name='" + tabName + "']";
+				CORE.UI.setupExpandableDiv(tabHeadingControl, tabDisplayName, accordionId, tabDataName, expandbyDefault);
+			}
+		},
+		setupExpandableSection: function (sectionDisplayName, sectionName, expandbyDefault)
+		{
+			var accordionId = "accId_" + sectionName;
+			var sectionDataName = "table[data-name='" + sectionName + "']";
+			var sectionControl = "legend:contains('" + sectionDisplayName + "')";
+			if (sectionControl != null)
+			{
+				CORE.UI.setupExpandableDiv(sectionControl, sectionDisplayName, accordionId, sectionDataName, expandbyDefault);
+			}
+		},
+		setupExpandableDiv: function (headingControl, headingDisplayName, accordionId, showHideAreaDataName, expandbyDefault)
+		{
+			var headingCont = $(headingControl);
+			if (headingCont == null) return;
+			var OpenedClosed = "closed";
+			if (expandbyDefault)
+			{
+				OpenedClosed = "open";
+			}
+			// Accordion
+			$(showHideAreaDataName).wrap("<div class='au-accordion__body au-accordion--" + OpenedClosed + "' id='" + accordionId + "'></div>").wrap("<div class='au-accordion__body-wrapper'></div>");
+			$($(headingControl)[0]).replaceWith("<button class='au-accordion__title js-au-accordion au-accordion--" + OpenedClosed + "' aria-controls='" + accordionId + "' aria-expanded='" + expandbyDefault + "' id='btn_" + accordionId + "'>" + headingDisplayName + "</button>");
+			$("#" + accordionId + ",#btn_" + accordionId).wrapAll("<section class='js au-accordion'></section>");
+			$("#btn_" + accordionId).click(function ()
+			{
+				var result = AU.accordion.Toggle(this, 125);
+				return result;
+			});
+		},
+		processMoneyFieldsAllowingNegativeValues: function ()
+		{
+			CORE.UI.setupCurrencyFields();
+			$.each($("input[class*='money'][readonly!='readonly']"), function (index, value)
+			{
+				if (value != 'undefined')
+				{
+					var displayName = $("#" + value.id + "_label").html();
+					CORE.Validation.addRangeValidator(value.id, displayName, -99999999.99, 9999999999.99, "currency");
+				}
+			});
+		},
+		processMoneyFields: function ()
+		{
+			CORE.UI.setupCurrencyFields();
+			$.each($("input[class*='money'][readonly!='readonly']"), function (index, value)
+			{
+				if (value != 'undefined')
+				{
+					var displayName = $("#" + value.id + "_label").html();
+					CORE.Validation.addRangeValidator(value.id, displayName, 0, 9999999999, "currency");
+				}
+			});
+		},
+		setupCurrencyFields: function ()
+		{
+			// Adds the $ to the money fields that dont have one.
+			$("input[class*='money']").filter(function ()
+			{
+				return !this.value && $(this).parent().attr('class') != 'input-group';
+			}).before("<span class='input-group-addon'>$</span>");
+			$("input[class*='money']").filter(function ()
+			{
+				return !this.value && $(this).parent().attr('class') != 'input-group';
+			}).parent().addClass('input-group');
+		},
+		setFieldSeriesToNull: function (fieldName, endFldNo)
+		{
+			for (var i = 1; i <= endFldNo; i++)
+			{
+				$("#" + fieldName.replace("{i}", i)).val("");
+			}
+		},
+		removeFieldSeriesLabels: function (fieldName, endFldNo)
+		{
+			for (var i = 2; i <= endFldNo; i++)
+			{
+				var fieldLabelName = fieldName.replace("{i}", i) + "_label";
+				var fieldLabelToHide = document.getElementById(fieldLabelName);
+				fieldLabelToHide.parentNode.style.display = 'none';
+			}
+		},
+		removeFieldSeriesWebResource: function (fieldName, endFldNo)
+		{
+			for (var i = 2; i <= endFldNo; i++)
+			{
+				var fieldLabelName = fieldName.replace("{i}", i);
+				var fieldLabelObject = $('label[for="' + fieldLabelName + '"]');
+				if (fieldLabelObject.length > 0)
+				{
+					fieldLabelObject[0].parentNode.style.display = 'none';
+				}
+			}
+		},
+		setFieldSeriesMandatory: function (fieldName, isMandatory, errorMsg, endFldNo)
+		{
+			for (var i = 1; i <= endFldNo; i++)
+			{
+				CORE.Validation.setFieldMandatory(fieldName.replace("{i}", i), isMandatory, errorMsg.replace("{i}", i));
+			}
+		},
+		addFieldSeriesNumericValidation: function (fieldName, errorMsg, endFldNo)
+		{
+			for (var i = 1; i <= endFldNo; i++)
+			{
+				var fieldtype = fieldName.indexOf("patientsperyear") != -1 ? "integer" : "money";
+				CORE.Validation.addNumericValidator(fieldName.replace("{i}", i), errorMsg.replace("{i}", i), fieldtype, true);
+			}
+		},
+		showGridMandatoryValidation: function (gridName, errorMsg, isNotHidden, validatorName)
+		{
+			CORE.UI.addValidator(gridName, CORE.Validation.getValidationMessageWarning(errorMsg), function ()
+			{
+				return !isNotHidden;
+			}, validatorName, "", false);
+		},
+		//TODO: Field will be removed from form, code cleanup required.
+		handleEconomicModelChange: function ()
+		{
+			var ecoModelType = $("#core_economicmodeltype").val();
+			CORE.UI.removeValidator("Economicevaluationattachment", "coreeconvalidator");
+			if (ecoModelType == 370410000)
+			{
+				// handle Cost-effectiveness analysis
+				CORE.UI.setFormSectionVisibility("tabSubmissionDetails_BaseCaseICERSection", true);
+				$("label[for='BaseCaseICERs']").parent().toggleClass("required", true);
+				try
+				{
+					// Subgrid doesnt load straight away, we are searching the DOM, hence wait 2secs before looking for our grid.
+					setTimeout(function ()
+					{
+						$("tr[data-name='Economic evaluation']").children("[data-th='Mandatory']")[0].innerHTML = "Yes";
+						if ($("tr[data-name='Economic evaluation']").children("[data-th='Document uploaded']")[0].innerHTML == "No")
+						{
+							CORE.UI.removeValidator("Economicevaluationattachment", "coreeconvalidator");
+							CORE.UI.showGridMandatoryValidation("Economicevaluationattachment", "Economic evaluation attachment", true, "coreeconvalidator");
+						}
+						else
+						{
+							CORE.UI.removeValidator("Economicevaluationattachment", "coreeconvalidator");
+						}
+					}, 2000);
+				}
+				catch (e)
+				{}
+			}
+			else if (ecoModelType == 370410001)
+			{
+				// handle Cost minimisation
+				CORE.UI.setFormSectionVisibility("tabSubmissionDetails_BaseCaseICERSection", false);
+				$("label[for='BaseCaseICERs']").parent().toggleClass("required", false);
+				try
+				{
+					// Subgrid doesnt load straight away, we are searching the DOM, hence wait 2secs before looking for our grid.
+					setTimeout(function ()
+					{
+						$("tr[data-name='Economic evaluation']").children("[data-th='Mandatory']")[0].innerHTML = "Yes";
+						if ($("tr[data-name='Economic evaluation']").children("[data-th='Document uploaded']")[0].innerHTML == "No")
+						{
+							CORE.UI.removeValidator("Economicevaluationattachment", "coreeconvalidator");
+							CORE.UI.showGridMandatoryValidation("Economicevaluationattachment", "Economic evaluation attachment", true, "coreeconvalidator");
+						}
+						else
+						{
+							CORE.UI.removeValidator("Economicevaluationattachment", "coreeconvalidator");
+						}
+					}, 2000);
+				}
+				catch (e)
+				{}
+			}
+			else
+			{
+				// economic evaluation type not selected
+				CORE.UI.setFormSectionVisibility("tabSubmissionDetails_BaseCaseICERSection", false);
+				$("label[for='BaseCaseICERs']").parent().toggleClass("required", false);
+				try
+				{
+					// Subgrid doesnt load straight away, we are searching the DOM, hence wait 2secs before looking for our grid.
+					setTimeout(function ()
+					{
+						// not applicable for major submission
+						var appType = $("#core_applicationsubtype").val();
+						if (appType != 370410000)
+						{
+							if ($("tr[data-name='Economic evaluation']").children("[data-th='Document uploaded']")[0].innerHTML == "Yes")
+							{
+								$("tr[data-name='Economic evaluation']").children("[data-th='Mandatory']")[0].innerHTML = "Yes";
+								CORE.UI.removeValidator("Economicevaluationattachment", "coreeconvalidator");
+							}
+							else
+							{
+								$("tr[data-name='Economic evaluation']").children("[data-th='Mandatory']")[0].innerHTML = "No";
+								CORE.UI.removeValidator("Economicevaluationattachment", "coreeconvalidator");
+							}
+						}
+					}, 2000);
+				}
+				catch (e)
+				{}
+			}
+		},
+		base64toBlob: function (base64Data, contentType)
+		{
+			contentType = contentType || '';
+			var sliceSize = 1024;
+			var byteCharacters = atob(base64Data);
+			var bytesLength = byteCharacters.length;
+			var slicesCount = Math.ceil(bytesLength / sliceSize);
+			var byteArrays = new Array(slicesCount);
+			for (var sliceIndex = 0; sliceIndex < slicesCount; ++sliceIndex)
+			{
+				var begin = sliceIndex * sliceSize;
+				var end = Math.min(begin + sliceSize, bytesLength);
+				var bytes = new Array(end - begin);
+				for (var offset = begin, i = 0; offset < end; ++i, ++offset)
+				{
+					bytes[i] = byteCharacters[offset].charCodeAt(0);
+				}
+				byteArrays[sliceIndex] = new Uint8Array(bytes);
+			}
+			return new Blob(byteArrays,
+			{
+				type: contentType
+			});
+		},
+		downloadDocument: function (filename, filecontent)
+		{
+			if (typeof window.navigator.msSaveBlob !== 'undefined')
+			{
+				// to support IE file download                               
+				window.navigator.msSaveBlob(CORE.UI.base64toBlob(filecontent, "application/pdf"), filename);
+			}
+			else
+			{
+				var element = document.createElement('a');
+				element.setAttribute('href', 'data:application/octet-stream;base64,' + filecontent);
+				element.setAttribute('download', filename);
+				element.style.display = 'none';
+				document.body.appendChild(element);
+				element.click();
+				document.body.removeChild(element);
+			}
+		},
+		setupStylingClasses: function ()
+		{
+			// Note: It is best practice to hide the body element before this setup and show it afterwards.
+			//       This is so the page doesnt flicker and change in front of the users.
+			// Textboxes
+			$("input[type=text]").addClass("au-text-input");
+			$("input[type=url]").addClass("au-text-input");
+			$("input[type=email]").addClass("au-text-input");
+			$("input[type=password]").addClass("au-text-input");
+			$("input[class='query form-control']").addClass("au-text-input"); // search boxes
+			// Text Areas
+			$("textarea").addClass("au-text-input au-text-input--block");
+			// fix disabled inputs.
+			$("input[disabled]").removeClass("form-control");
+			$("input[disabled]").removeClass("disabled");
+			// Fix Username / password (left labels)
+			$("label[for='Username']").attr("style", "padding-top:0.8rem;");
+			$("label[for='Password']").attr("style", "padding-top:0.8rem;");
+			// Grid button fix - this has been added to the entity list code on loaded event.
+			//$("a[class*='insert-Action-link btn-primary']").addClass("au-btn");
+			// Drop-down-lists
+			$("select").addClass("au-select");
+			// Radio buttons
+			$("input[type=radio]").siblings().addClass("au-control-input");
+			// Buttons
+			$(".entitylist.entity-grid").on("loaded", function ()
+			{
+				CORE.UI.setupButtonStyles();
+				// Make all the links tabable
+				$('.details-link').prop('tabindex', '0')
+			});
+			$(".entity-grid.subgrid").on("loaded", function ()
+			{
+				CORE.UI.setupButtonStyles();
+			});
+			CORE.UI.setupButtonStyles();
+			// Check-boxes
+			// Find every Input checkbox and add a 'change' listener to run a function which will add the 'checked' class to the span above the checked box.
+			var checkboxes = $("input[type=checkbox]");
+			$.each(checkboxes, function (index, value)
+			{
+				if (value != 'undefined')
+				{
+					CORE.UI.checkboxChecked(value);
+					$(value).change(function ()
+					{
+						CORE.UI.checkboxChecked(value);
+					});
+				}
+			});
+			// bug 142701
+			// The following should only apply to OOB Validation, manually make the span element focusable by injecting tabindex
+			var spaneOOBValidation = $("span.picklist[data-required='true']");
+			spaneOOBValidation.attr("tabindex", 0);
+			// Apply to both the custom validation and OOB validation
+			// For all the picklist span, i.e. radio button span, we want to color the span outline as blue only if the validation summary is visible and the span has focus.
+			var spanPicklist = $("span.picklist");
+			spanPicklist.focus(function ()
+			{
+				if ($(".validation-summary").length > 0 && $(".validation-summary").is(":visible"))
+				{
+					$(this).css("outline", "3px solid #45c2f0");
+					$(this).css("outline-offset", "2px");
+				}
+				else
+				{
+					$(this).css("outline", "none");
+				}
+			});
+			spanPicklist.blur(function ()
+			{
+				$(this).css("outline", "none");
+			});
+			// Bug 164888, add focus and blur event handler to add blue outline to subgrid when clicking on the validation error
+			var validatorSubgridLocation = $("div.subgrid");
+			var validatorLocatorBlueOutline = "3px solid #45c2f0";
+			validatorSubgridLocation.focus(function ()
+			{
+				if ($(".validation-summary").length > 0 && $(".validation-summary").is(":visible"))
+				{
+					$(this).css("outline", validatorLocatorBlueOutline);
+					$(this).css("outline-offset", "2px");
+				}
+				else
+				{
+					$(this).css("outline", "none");
+				}
+			});
+			validatorSubgridLocation.blur(function ()
+			{
+				$(this).css("outline", "none");
+			});
+			// Fixes the bottom action buttons so they dont flow onto a new line
+			$("#WebFormPanel .actions > div").removeClass("col-sm-6");
+			$("#WebFormPanel .actions > div").addClass("col-sm-12");
+		},
+		checkboxChecked: function (value)
+		{
+			if ($(value)[0].checked)
+			{
+				$(value).parent().addClass("checkbox-checked");
+			}
+			else
+			{
+				$(value).parent().removeClass("checkbox-checked");
+			}
+		},
+		setupButtonStyles: function ()
+		{
+			// Primary Buttons
+			$("input[type=button][class*='btn-primary']").addClass("au-btn");
+			$("input[class*='btn-primary']").addClass("au-btn");
+			$("button[class*='btn-primary']").addClass("au-btn");
+			$("a[class*='btn-primary']").addClass("au-btn");
+			// Secondary Buttons
+			$("input[type=button][class*='btn-default']").addClass("au-btn");
+			$("input[type=button][class*='btn-default']").addClass("au-btn--secondary");
+			$("a[class*='btn-default']").addClass("au-btn");
+			$("a[class*='btn-default']").addClass("au-btn--secondary");
+			$(".modal-footer > button[class*='btn-default']").addClass("au-btn");
+			$(".modal-footer > button[class*='btn-default']").addClass("au-btn--secondary");
+			// Workflow link buttons
+			$("button[class*='workflow-link']").addClass("au-btn");
+			$("button[class*='workflow-link']:contains('Reject')").addClass("au-btn--secondary");
+		},
+		/**
+		 * Creates the grid of User Sessions, checking if there have been any user sessions in the last hour
+		 * - Requires a Section (tab) on the CRM form to be created and passed in here.
+		 * @param {string} tabName - The tab name to make the accordian out of.
+		 * @param {string} submissionId - The submission Id to get the web sessions for.
+		 */
+		setupMultipleUserSessions: function (tabName, submissionId, currentUserId)
+		{
+			// Setup the Accordian and make invisible by default.
+			CORE.UI.setWidthOfTable("table[data-name='" + tabName + "']", 0, "width:5%");
+			CORE.UI.setupExpandableSection("User Sessions", tabName, false);
+			CORE.UI.setFormSectionVisibility(tabName, false);
+			// Hide the entire Accordian 
+			$("#accId_" + tabName).parent().parent().attr("style", "display:none;");
+			// Construct and execute the fetchXML to find any web sessions.
+			var fetchData = {
+				createdon: "1",
+				core_submission: submissionId
+			};
+			var fetchXml = [
+                "<fetch distinct='true'>",
+                "  <entity name='core_submissionsession'>",
+                "    <attribute name='core_portalcontact' />",
+                "    <filter>",
+                "      <condition attribute='createdon' operator='last-x-hours' value='", fetchData.createdon, "'/>",
+                "      <condition attribute='core_submission' operator='eq' value='", fetchData.core_submission, "'/>",
+                "    </filter>",
+                "  </entity>",
+                "</fetch>",
+            ].join("");
+			$.ajax(
+			{
+				cache: false,
+				url: "/fetchxmlservice/",
+				data: {
+					query: encodeURIComponent(fetchXml),
+					columnset: "core_portalcontact"
+				},
+				success: function (data)
+				{
+					if (data.results.length === 1 && data.results[0].core_portalcontact.id === currentUserId)
+					{
+						// Hide the entire Accordian as this the is logged in user
+						$("#accId_" + tabName).parent().parent().attr("style", "display:none;");
+					}
+					else if (data.results.length > 0)
+					{
+						// Add the sessions users to the list and show the User Sessions section.
+						CORE.UI.setFormSectionVisibility(tabName, true);
+						var content = "<div>Please note: Other users have accessed this submission/application in the last 60 minutes and may be working on this submission/application currently. Data may be lost if multiple users are working on the same submission/application at once.&nbsp;Users who have accessed this submission/application in the last 60 minutes:&nbsp;&nbsp;</div>";
+						data.results.forEach(function (contact)
+						{
+							if (contact.core_portalcontact.id != currentUserId)
+							{
+								content += "<div style='font-weight:bold;'>" + contact.core_portalcontact.name + "</div>";
+							}
+						});
+						$("#accId_" + tabName + " > div")[0].innerHTML = content;
+						// Show the entire Accordian 
+						$("#accId_" + tabName).parent().parent().attr("style", "display:block;");
+					}
+					else
+					{
+						// Hide the entire Accordian as there are no results.
+						$("#accId_" + tabName).parent().parent().attr("style", "display:none;");
+					}
+				},
+				error: function (data)
+				{
+					// Log any errors that occur.
+					console.log("Error: Multiple User Sessions failed.");
+				}
+			});
+		},
+		/*
+		 * Searches the Drop down list for options by the text (not value) and shows or hides the option.
+		 *
+		 * @param {string}   dropdownSelector - the selector to find the DOM 'select'
+		 * @param {string}   textname         - the name of the text
+		 * @param {boolean}  show             - Show = true, hide = false.
+		 */
+		toggleOptionByText: function (dropdownSelector, textname, show)
+		{
+			if (show)
+			{
+				$(dropdownSelector + " option:contains('" + textname + "')").show();
+			}
+			else
+			{
+				$(dropdownSelector + " option:contains('" + textname + "')").hide();
+			}
+		},
+		/*
+		 * Searches the Drop down list for options by the value (not text) and shows or hides the option.
+		 *
+		 * @param {string}   dropdownSelector - the selector to find the DOM 'select'
+		 * @param {string}   value         -    the value of the options
+		 * @param {boolean}  show             - Show = true, hide = false.
+		 */
+		toggleOptionByValue: function (dropdownSelector, value, show)
+		{
+			if (show)
+			{
+				$(dropdownSelector + " option[value='" + value + "']").show();
+			}
+			else
+			{
+				$(dropdownSelector + " option[value='" + value + "']").hide();
+			}
+		},
+		/*
+		 * Searches the Drop down list for options and shows or hides all options.
+		 *
+		 * @param {string}   dropdownSelector - the selector to find the DOM 'select'
+		 * @param {boolean}  show             - Show = true, hide = false.
+		 */
+		toggleAllDropdownOptions: function (dropdownSelector, show)
+		{
+			if (show)
+			{
+				$(dropdownSelector).children('option').show();
+			}
+			else
+			{
+				$(dropdownSelector).children('option').hide();
+			}
+		},
+		/*
+		 * Setups the overflow fix for a subgrid
+		 */
+		setupGridOverflowFix: function (subgrid)
+		{
+			// Fix overflow for insert form.
+			var insertModal = parent.$("#" + subgrid + " > div > section.modal.fade.modal-form.modal-form-insert.in > div > div > div.modal-body", top.window.document).length;
+			if (insertModal > 0)
+			{
+				parent.$("#" + subgrid + " > div > section.modal.fade.modal-form.modal-form-insert.in > div > div > div.modal-body", top.window.document).css(
+				{
+					"max-height": "calc(100vh - 130px)"
+				});
+				parent.$("#" + subgrid + " > div > section.modal.fade.modal-form.modal-form-insert.in > div > div > div.modal-body", top.window.document).css(
+				{
+					"overflow-y": "auto"
+				})
+			}
+			// Fix overflow for details form
+			var detailsModal = parent.$("#" + subgrid + " > div > section.modal.fade.modal-form.modal-form-details.in > div > div > div.modal-body", top.window.document).length;
+			if (detailsModal > 0)
+			{
+				parent.$("#" + subgrid + " > div > section.modal.fade.modal-form.modal-form-details.in > div > div > div.modal-body", top.window.document).css(
+				{
+					"max-height": "calc(100vh - 130px)"
+				});
+				parent.$("#" + subgrid + " > div > section.modal.fade.modal-form.modal-form-details.in > div > div > div.modal-body", top.window.document).css(
+				{
+					"overflow-y": "auto"
+				})
+			}
+		},
+		/**
+		 * WCAG compliance: prevent form from intercepting Enter click on datepicker and prevent default behavior.
+		 */
+		setupWCAGFix: function ()
+		{
+			$("#content_form").on("keydown keypress", function (e)
+			{
+				var keyCode = e.keyCode || e.which;
+				if (keyCode == "13" && event.target.firstChild && event.target.firstChild.className == "icon-calendar fa fa-calendar")
+				{
+					e.preventDefault();
+					return false
+				}
+			});
+		},
+		/**
+		 * Sets up the close confirmation on each of the subgrid models including the form-insert, form-edit, and form-details.
+		 * @param {string} subgridName - the dom name of the subgrid
+		 *
+		 * Dependancies: CORE.UI.js library for the confirm dialog.
+		 */
+		setupSubgridCloseModal: function (subgridName)
+		{
+			// modal-form-insert
+			$("div#" + subgridName + " > div > section.modal.fade.modal-form.modal-form-insert").attr('data-close-allowed', 'true');
+			CORE.UI.confirmModalClose($("div#" + subgridName + " > div > section.modal.fade.modal-form.modal-form-insert"), function ()
+			{});
+			// modal-form-details
+			$("div#" + subgridName + " > div > section.modal.fade.modal-form.modal-form-details").attr('data-close-allowed', 'true');
+			CORE.UI.confirmModalClose($("div#" + subgridName + " > div > section.modal.fade.modal-form.modal-form-details"), function ()
+			{});
+			// modal-form-edit
+			$("div#" + subgridName + " > div > section.modal.fade.modal-form.modal-form-edit").attr('data-close-allowed', 'true');
+			CORE.UI.confirmModalClose($("div#" + subgridName + " > div > section.modal.fade.modal-form.modal-form-edit"), function ()
+			{});
+		},
+		/**
+		 * Decodes the inputted HTML
+		 * @param {string} input - the encoded HTML e.g &lt;
+		 */
+		htmlDecode: function (input)
+		{
+			var doc = new DOMParser().parseFromString(input, "text/html");
+			return doc.documentElement.textContent;
+		},
+		radioButtonSelected: function (fieldId)
+		{
+			var radioButtonChecked = false;
+			$("input[name*='" + fieldId + "']").each(function (index, ctrl)
+			{
+				if ($(ctrl)[0].checked)
+				{
+					radioButtonChecked = true;
+				}
+			});
+			return radioButtonChecked;
+		},
+		getSelectedRadioButtonValue: function (fieldId)
+		{
+			var checkedValue = null;
+			$("input[name*='" + fieldId + "']").each(function (index, ctrl)
+			{
+				if ($(ctrl)[0].checked)
+				{
+					checkedValue = $(ctrl)[0].value;
+				}
+			});
+			return checkedValue;
+		},
+		/**
+		 * Refreshes a Subgrid while negating its cache, by updating a field via the webAPI.
+		 * @param {string} subgridSelector - The Jquery selctor for the subbrig e.g: #products
+		 * @param {function} callback? - a callback function to execute
+		 *
+		 * Dependencies: WebAPI - Sitesettings - You must include your entity in the site settings
+		 */
+		refreshSubgridNoCache: function (subgridSelector, callback)
+		{
+			// Get needed data
+			var subgrid = $(subgridSelector);
+			var recordId = subgrid.find("tbody tr").attr("data-id");
+			var recordEntityName = subgrid.find("tbody tr").attr("data-entity");
+			if (typeof (subgrid) == "undefined" || typeof (recordId) == "undefined" || typeof (recordEntityName) == "undefined")
+			{
+				return;
+			}
+			// Determine entity plural name
+			var pluralEntityName = recordEntityName + "s";
+			if (recordEntityName.substring(recordEntityName.length - 1) == "s")
+			{
+				pluralEntityName = recordEntityName + "es";
+			}
+			// Update the modified on of a record in the subgrid to negate the subgrid cache (has tobe through WebAPI)
+			var dataToUpdate = {
+				"modifiedon": Date.now().toString()
+			};
+			CORE.Services.UpdateRecord(pluralEntityName, recordId, dataToUpdate, function ()
+			{
+				subgrid.children().trigger("refresh"); // Refresh grid on callback (promise)
+				if (callback)
+				{
+					callback();
+				}
+			});
+		},
+		/**
+		 * Allows linking up a page on portal to a knowledege article
+		 * @param {string} knowledgeArticleIdentifyingValue - Knowledge Article with the Title which must be an exact match and must be published
+		 * @param {string} locationToInsert - Optional DOM element where the image icon should be shown, if not specified, then uses the h2 heading on the page
+		 */
+		handlePortalPageHelp: function (knowledgeArticleIdentifyingValue, locationToInsert)
+		{
+			if (knowledgeArticleIdentifyingValue)
+			{
+				var fetchXml = "<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>" +
+					"<entity name='knowledgearticle'>" +
+					"<attribute name='knowledgearticleid' />" +
+					"<filter type='and'>" +
+					"<condition attribute='isrootarticle' operator='eq' value='0' />" +
+					"<condition attribute='title' operator='eq' value='" + knowledgeArticleIdentifyingValue + "' />" +
+					"<condition attribute='statecode' operator='eq' value='3' />" +
+					"</filter>" +
+					"</entity>" +
+					"</fetch>";
+				$.ajax(
+				{
+					method: "POST",
+					cache: false,
+					dataType: "json",
+					url: "/fetchxmlservice/",
+					data: {
+						//define FetchXML query
+						query: encodeURIComponent(fetchXml),
+						//define attributes collection to return values from query
+						columnset: "knowledgearticleid"
+					},
+					success: function (records)
+					{
+						if (records.results.length > 0)
+						{
+							if ($("#imgPageHelp").length == 0)
+							{
+								let clickableInfoIcon = document.createElement("a");
+								clickableInfoIcon.setAttribute('href', '#');
+								var informationIcon = document.createElement('img');
+								informationIcon.setAttribute('id', 'imgPageHelp');
+								informationIcon.setAttribute('src', '/info_icon.svg');
+								informationIcon.setAttribute('title', 'Click here to access further help regarding this page (opens in a new window)');
+								informationIcon.setAttribute('alt', 'Click here to access further help regarding this page (opens in a new window)');
+								informationIcon.setAttribute('style', 'padding-left: 10px; cursor: help;');
+								clickableInfoIcon.append(informationIcon);
+								clickableInfoIcon.onclick = function ()
+								{
+									window.open("/knowledgearticleportalpagehelp?id=" + records.results[0].knowledgearticleid, "_blank");
+								};
+								if (locationToInsert)
+								{
+									$(locationToInsert).append(clickableInfoIcon);
+								}
+								else
+								{
+									$('h2.tab-title').append(clickableInfoIcon);
+								}
+								$("#imgPageHelp").tooltip(
+								{
+									placement: "right"
+								});
+							}
+						}
+					},
+					error: function (errorMessage)
+					{
+						console.log(errorMessage);
+					}
+				});
+			}
+		},
+		/**
+		 * Adds a help icon to a field label with a popover (bootstrap) content.
+		 * @param {string} fieldname  - The name of the control
+		 * @param {string} message    - The text or HTML message to provide to the user
+		 * @param {string} placement? - Optional position of the popover compared to the image - top | bottom | left | right | auto
+		 * @param {string} title?     - Optional title of the popup
+		 * @param {string} image?     - Optional image source '/information.svg' (default) all images will be sized (width) to 1.3rem
+		 * @param {string} imgpos?    - Optional the position of the icon against the label - left | right(default)
+		 */
+		fieldSpecificHelp: function (fieldname, message, placement, title, image, imgpos)
+		{
+			// Append the information icon
+			var control = $("<div class='helptip' data-toggle='popover'><img id='fsHelpImg' src='/info_icon.svg' alt='help' /></div>"); //information.svg
+			var label = $("label[for='" + fieldname + "']").parent();
+			if (label.length === 0)
+			{
+				label = $("label[id='" + fieldname + "_label']").parent()
+			}
+			// Position the icon to the right or left of the Label.
+			if (imgpos)
+			{
+				if (imgpos == "left")
+				{
+					label.prepend(control);
+				}
+				else
+				{
+					label.append(control);
+				}
+			}
+			else
+			{
+				label.append(control);
+			}
+			// Add custom options if included
+			if (title)
+			{
+				control.attr("data-original-title", title);
+			}
+			if (image)
+			{
+				$("#fsHelpImg").attr("src", image);
+			}
+			var pos = "top";
+			if (placement)
+			{
+				place = placement;
+			}
+			// Add Bootstrap Popover & events
+			$('[data-toggle="popover"]').popover(
+			{
+				trigger: "manual",
+				html: true,
+				content: message,
+				placement: place,
+				animation: false
+			}).on("mouseenter", function ()
+			{
+				var _this = this;
+				$(this).popover("show");
+				$(".popover").on("mouseleave", function ()
+				{
+					$(_this).popover('hide');
+				});
+			}).on("mouseleave", function ()
+			{
+				var _this = this;
+				setTimeout(function ()
+				{
+					if (!$(".popover:hover").length)
+					{
+						$(_this).popover("hide");
+					}
+				}, 300);
+			});
+		},
+		/**
+		 * Adds a single level navigation tree structure on the page
+		 * @param {array} arrayOfItems  - The array of objects to iterate over, the objects must have the structure {"groupKey": "", "title": "", "link": "", "current" : true|false, "isComplete" : true|false, "completeImageTitle" : ""}
+		 * @param {string} placement - The location to place the navigation item
+		 * From https://www.w3schools.com/howto/howto_js_treeview.asp
+		 */
+		setUpNavigationTree: function (arrayOfItems, placement)
+		{
+			var groupKeys = new Array();
+			for (var i = 0; i < arrayOfItems.length; i++)
+			{
+				var item = arrayOfItems[i];
+				if (groupKeys.indexOf(item.groupKey) === -1)
+				{
+					groupKeys.push(item.groupKey);
+				}
+			}
+			var getItemsForGroupKey = function (groupKey)
+			{
+				var items = new Array();
+				$.grep(arrayOfItems, function (v)
+				{
+					if (v.groupKey === groupKey)
+					{
+						items.push(
+						{
+							"title": v.title,
+							"link": v.link,
+							"current": v.current,
+							"isComplete": v.isComplete,
+							"completeImageTitle": v.completeImageTitle
+						});
+					}
+				});
+				return items;
+			};
+			var containerDiv = document.createElement('div');
+			var treeNode = document.createElement('ul');
+			treeNode.id = "ulTreeHead";
+			var getTruncatedText = function (text, length)
+			{
+				if (text && text.length > length)
+				{
+					text = text.substring(0, length - 1) + "...";
+				}
+				return text;
+			}
+			for (var i = 0; i < groupKeys.length; i++)
+			{
+				var groupKey = groupKeys[i];
+				var groupLi = document.createElement('li');
+				var groupSpan = document.createElement('span');
+				groupSpan.className = "navigationTreeGroupStyle";
+				groupSpan.innerHTML = getTruncatedText(groupKey, 40);
+				groupSpan.title = groupKey;
+				groupLi.appendChild(groupSpan);
+				treeNode.appendChild(groupLi);
+				var matchingItems = getItemsForGroupKey(groupKey);
+				var nestedUl = document.createElement('ul');
+				nestedUl.className = "navigationTreeNestedStyle";
+				for (var j = 0; j < matchingItems.length; j++)
+				{
+					var item = matchingItems[j];
+					var itemLi = document.createElement('li');
+					itemLi.className = "navigationTreeItemStyle";
+					var anchor = document.createElement('a');
+					anchor.href = item.link;
+					anchor.innerText = getTruncatedText(item.title, 30);
+					anchor.title = item.title;
+					anchor.className = "navigationTreeItemAnchorStyle";
+					if (item.current === true)
+					{
+						anchor.classList.add("navigationTreeItemAnchorCurrentStyle");
+						itemLi.classList.add("navigationTreeItemCurrentStyle");
+					}
+					if (item.isComplete === true)
+					{
+						var image = document.createElement('img');
+						image.src = '/success-tick-circle.svg';
+						image.title = item.completeImageTitle;
+						image.alt = item.completeImageTitle;
+						image.className = "navigationTreeCompletedImageStyle";
+						itemLi.appendChild(image);
+						anchor.classList.add("navigationTreeItemAnchorCompletedStyle");
+					}
+					itemLi.appendChild(anchor);
+					nestedUl.appendChild(itemLi);
+				}
+				groupLi.appendChild(nestedUl);
+			}
+			containerDiv.append(treeNode);
+			$(placement).prepend(containerDiv);
+			$("a.navigationTreeItemAnchorStyle").tooltip(
+			{
+				placement: "bottom"
+			});
+			$("span.navigationTreeGroupStyle").tooltip(
+			{
+				placement: "bottom"
+			});
+			$("img.navigationTreeCompletedImageStyle").tooltip(
+			{
+				placement: "bottom"
+			});
+			var toggler = document.getElementsByClassName("navigationTreeGroupStyle");
+			for (var i = 0; i < toggler.length; i++)
+			{
+				toggler[i].addEventListener("click", function ()
+				{
+					this.parentElement.querySelector(".navigationTreeNestedStyle").classList.toggle("navigationTreeActive");
+					this.classList.toggle("navigationTreeGroupStyle-down");
+				});
+				toggler[i].click();
+			}
+		},
+		/**
+		 * A JQuery UI progress bar using the standard modal dialog to show it over the entire screen.
+		 * This is intended for long running sync processes (client side)
+		 */
+		ProgressBar: {
+			_currentValue: 1,
+			/**
+			 * Moves the Progress bar from its current value to the provided % over 1 second.
+			 * @param {int} val - The value to animate the progress bar to (1- 99)%.
+			 */
+			MoveTo: function (val)
+			{
+				console.log(`Progress bar move from: $
+				{
+					this.currentValue
+				} % to $
+				{
+					val
+				} % `);
+				$(".ui-progressbar-value").animate(
+				{
+					width: (val + 2) + '%'
+				},
+				{
+					duration: 1000,
+					step: function (now, fx)
+					{
+						$('.ui-progressbar-value').html((parseInt(now) - 2) + '%');
+					}
+				});
+				this.currentValue = val;
+			},
+			/**
+			 * Resets the Progress bar to 1% and shows it to the user.
+			 * @param {string} message - a text message to show on top of the progress bar. e.g 'loading'
+			 */
+			Start: function (message)
+			{
+				this.currentValue = 1;
+				$(".ui-progressbar-value").css("width", "1%");
+				$(".ui-progressbar-value").html("1%");
+				this.Show(message);
+				console.log("Progress bar started");
+			},
+			/**
+			 * Moves the Progress bar to 99% from wherever its currently at and after a 2sec delay hides it.
+			 * @param {func} callback? - Optional callback function to enact once its finished.
+			 */
+			End: function (callback)
+			{
+				this.MoveTo(99);
+				this.currentValue = 99;
+				$(".ui-progressbar-value").promise().done(function ()
+				{
+					CORE.UI.ProgressBar.Message("Complete");
+					if (callback)
+					{
+						CORE.UI.ProgressBar.Hide(2000, callback);
+					}
+					else
+					{
+						CORE.UI.ProgressBar.Hide(2000);
+					}
+				});
+				console.log("Progress bar finished");
+			},
+			/**
+			 * A Timed progress bar which goes from 1% to 99% in a given number of milliseconds
+			 * @param {int} ms - number of milliseconds for the progress bar to reach 99%.
+			 * @param {string} message - a text message to show on top of the progress bar. e.g 'loading'
+			 */
+			Timed: function (ms, message)
+			{
+				this.Start(message);
+				$(".ui-progressbar-value").animate(
+				{
+					width: '102%'
+				},
+				{
+					duration: ms,
+					step: function (now, fx)
+					{
+						$('.ui-progressbar-value').html((parseInt(now) - 3) + '%');
+					},
+					complete: function ()
+					{
+						CORE.UI.ProgressBar.Message("Please wait");
+					}
+				});
+			},
+			/**
+			 * Changes the Message of the progress bar
+			 * @param {string} message - The text message to display on the progress bar.
+			 */
+			Message: function (message)
+			{
+				$('#progressMessage').html(message);
+			},
+			/**
+			 * Shows the Progress Bar in a modal dialog.
+			 * @param {string} message - a text message to show on top of the progress bar. e.g 'loading'
+			 */
+			Show: function (message)
+			{
+				if ($("#loadingProgress").length == 0)
+				{
+					var addMessage = "";
+					if (message)
+					{
+						addMessage = message
+					}
+					var contentElement = "<div id='progressMessage' style='margin:0.5rem; text-align:center'>" + message + "</div><div id='pBar' style='margin:1rem 2rem 2rem 2rem;' max='99'></div>";
+					var dialogElement = "<div id='loadingProgress' class='modal fade core-modal-lg' data-backdrop='static' data-keyboard='false' tabindex='-1'><div class='modal-dialog modal-m' style='display: table; position: fixed; margin: 0 auto; top: calc(50% - 36px); left: calc(50% - 300px);'><div class='modal-content' style='min-height:100px;'>" + contentElement + "</div></div></div>";
+					$(dialogElement).insertAfter($("body"));
+					$("#pBar").progressbar(
+					{
+						value: this.currentValue
+					});
+					$("#pBar").attr("aria-valuemax", "99");
+				}
+				$('#loadingProgress').modal(
+				{
+					backdrop: 'static',
+					keyboard: false
+				});
+				$('#loadingProgress').on('hide.bs.modal', function (e)
+				{
+					if ($(".ui-progressbar-value").html() !== "99%")
+					{
+						return e.preventDefault();
+					}
+				});
+			},
+			/**
+			 * Hides the Progress Bar
+			 * @param {int} delay - Hides the progress bar after this delay in milliseconds.
+			 * @param {func} callback? - Optional callback function to call after the delay.
+			 */
+			Hide: function (delay, callback)
+			{
+				this.currentValue = 1; // Reset the Progress bar for next time.
+				setTimeout(function ()
+				{
+					$("#loadingProgress").modal("hide");
+					if (callback)
+					{
+						callback();
+					}
+				}, delay);
+			}
+		},
+		/* ------------------------------- Start: Accordion functions -------------------------- */
+		/*
+        * Allows setting up accordions. The name of the first section of each tab is shown as accordion header
+        * @param {bool} ignoreFirstTab - can be used to ignore first tab, like 'General'
+        * @param {function} validateFunction - the function to call for validation of each tab, automatically passes in the tab name
+        * @param {function} callBack - called at the evaluation of each tab, passes in an object with a boolean property called allAccordionsValid that can be used to check if all accordions are valid or not.
+        * @param {function} loadComplete - called when all tabs have been loaded and converted to accordions.
+        * @param {array} tabsToIgnoreForValidation - use this to specify tabs that need server side validation. Then call reAdjustAccordionTabForValidation function once
+        the server side validation has returned.Similar in concept to refreshribbon
+        */
+		setupAccordianTabs: function (ignoreFirstTab, validateFunction, callBack, loadComplete, tabsToIgnoreForValidation)
+		{
+			var setUpAccordionProperty = function (divs, tabControl, index, tabsToIgnoreForValidation)
+			{
+				var tabName = CORE.UI.getTabName($(tabControl));
+				$(tabControl).prop('class', 'tab clearfix collapse');
+				$(tabControl).prop('data-target', '#collapse' + tabName);
+				$(tabControl).prop('id', "collapse" + tabName);
+				var header = $(tabControl).find('table').parent()[0].attributes['aria-label'].value;
+				var buttonName = 'btnAccordion' + tabName;
+				var buttonStyle = "style='margin-top:20px;display:none'";
+				var accordionButton = "<button id='" + buttonName + "' style='margin-top:20px' onclick='CORE.UI.handleAccordionExpandCollapse(this);' class='btn accordion-plus' type='button' data-toggle='collapse' data-target='#collapse" + tabName + "' aria-expanded='false' aria-controls='collapse" + tabName + "'>" + header + "<img id='btnAccordionImage" + tabName + "' src='/warning-tick.svg' style='display:none; margin-left: 5px;' alt='Success'></button>";
+				if (index === 0) //First one
+				{
+					accordionButton = accordionButton.replace("margin-top:20px;", "");
+					$("<input id='btnExpandAll' type='button' value='Expand all' style='margin-bottom:20px;' class='btn btn-primary button au-btn'><input id='btnCollapseAll' type='button' style='margin-left:20px;margin-bottom:20px;' value='Collapse all' class='btn btn-primary button au-btn'>").insertBefore(tabControl);
+					$("#btnExpandAll").click(function ()
+					{
+						$('.collapse:not(".in")').each(function ()
+						{
+							var buttonName = "btnAccordion" + CORE.UI.getTabName($(this));
+							if ($("#" + buttonName).is(":visible"))
+							{
+								$(this).collapse('show');
+							}
+						});
+						$("button[id*='btnAccordion']:visible").each(function ()
+						{
+							CORE.UI.handleAccordionExpandCollapse(this, true);
+						});
+					});
+					$("#btnCollapseAll").click(function ()
+					{
+						$('.collapse.in').collapse('hide');
+						$("button[id*='btnAccordion']:visible").each(function ()
+						{
+							CORE.UI.handleAccordionExpandCollapse(this, true);
+						});
+					});
+				}
+				$(tabControl).before(accordionButton);
+				if (!Array.isArray(tabsToIgnoreForValidation) || tabsToIgnoreForValidation.indexOf(tabName) === -1)
+				{
+					CORE.UI.adjustAccordionTabForValidation(divs, tabControl, validateFunction(tabName), callBack, tabsToIgnoreForValidation);
+				}
+			};
+			var linkInputChangeToValidation = function (tabControl)
+			{
+				var tabName = CORE.UI.getTabName($(tabControl));
+				$(tabControl).find('textarea,input,select').each(function ()
+				{
+					$(this).change(function ()
+					{
+						CORE.UI.adjustAccordionTabForValidation(divs, tabControl, validateFunction(tabName), callBack, tabsToIgnoreForValidation);
+					});
+				});
+				$(tabControl).find("div[id*='subgrid']").each(function ()
+				{
+					$(this).on("loaded", function ()
+					{
+						CORE.UI.adjustAccordionTabForValidation(divs, tabControl, validateFunction(tabName), callBack, tabsToIgnoreForValidation);
+					});
+				});
+			};
+			var divs = CORE.UI.getDivsToCheck(ignoreFirstTab);
+			var numberOfDivs = divs.length;
+			$(divs).each(function (index)
+			{
+				setUpAccordionProperty(divs, $(this), index, tabsToIgnoreForValidation);
+				var tabName = CORE.UI.getTabName($(this));
+				if (!Array.isArray(tabsToIgnoreForValidation) || tabsToIgnoreForValidation.indexOf(tabName) === -1)
+				{
+					linkInputChangeToValidation($(this));
+				}
+				if ((numberOfDivs - 1) === index && loadComplete)
+				{
+					loadComplete();
+				}
+			});
+		},
+		getDivsToCheck: function (ignoreFirstTab)
+		{
+			var divs = ignoreFirstTab === true ? $("div[data-name^='tab']").slice(1) : $("div[data-name^='tab']");
+			return $(divs);
+		},
+		handleAccordionExpandCollapse: function (accordionButton, expandCollapseAllButton)
+		{
+			if (expandCollapseAllButton === true)
+			{
+				var expanded = $(accordionButton).prop('ariaExpanded') === "true";
+				if (expanded)
+				{
+					$(accordionButton).addClass('accordion-minus');
+					$(accordionButton).removeClass('accordion-plus');
+				}
+				else
+				{
+					$(accordionButton).addClass('accordion-plus');
+					$(accordionButton).removeClass('accordion-minus');
+				}
+			}
+			else
+			{
+				var buttonClass = $(accordionButton).prop('class');
+				if (buttonClass.indexOf('accordion-plus') !== -1)
+				{
+					$(accordionButton).removeClass('accordion-plus');
+					$(accordionButton).addClass('accordion-minus');
+				}
+				else
+				{
+					$(accordionButton).removeClass('accordion-minus');
+					$(accordionButton).addClass('accordion-plus');
+				}
+			}
+		},
+		adjustAccordionTabForValidation: function (divs, tabControl, isValid, callBack, tabsToIgnoreForValidation)
+		{
+			var tabName = CORE.UI.getTabName($(tabControl));
+			if (isValid)
+			{
+				$(tabControl).removeClass("panel-alert");
+				$(tabControl).addClass("panel-success");
+				$("#btnAccordion" + tabName).addClass('accordion-success');
+				$("#btnAccordion" + tabName).removeClass('accordion-alert');
+				$("#btnAccordionImage" + tabName).prop('src', '/success-tick.svg');
+			}
+			else
+			{
+				$(tabControl).addClass("panel-alert");
+				$(tabControl).removeClass("panel-success");
+				$("#btnAccordion" + tabName).addClass('accordion-alert');
+				$("#btnAccordion" + tabName).removeClass('accordion-success');
+				$("#btnAccordionImage" + tabName).prop('src', '/warning-tick.svg');
+			}
+			$("#btnAccordionImage" + tabName).show();
+			if (callBack)
+			{
+				callBack(
+				{
+					allAccordionsValid: $(divs).filter("[class*='panel-success']").length === $(divs).length
+				});
+			}
+		},
+		/*
+		 * Can be called for accordions that need server side validation
+		 * @param {bool} ignoreFirstTab - can be used to ignore first tab, like 'General'
+		 * @param {string} tabName - the name of the tab
+		 * @param {bool} isValid - true or false
+		 * @param {function} callBack - called at the evaluation of each tab, passes in an object with a boolean property called allAccordionsValid that can be used to check if all accordions are valid or not.
+		 */
+		reAdjustAccordionTabForValidation: function (ignoreFirstTab, tabName, isValid, callBack)
+		{
+			var tabControl = $("div[data-name='" + tabName + "']")[0];
+			CORE.UI.adjustAccordionTabForValidation(CORE.UI.getDivsToCheck(ignoreFirstTab), tabControl, isValid, callBack);
+		},
+		getTabName: function (tabControl)
+		{
+			return $(tabControl).data('name');
+		},
+		/*
+		 * Allows showing or hiding an accordion
+		 * @param {string} tabName - can be used to ignore first tab, like 'General'
+		 * @param {bool} isVisible - true to show, false to hide
+		 */
+		showHideAccordion: function (tabName, isVisible)
+		{
+			$('#btnAccordion' + tabName).toggle(isVisible);
+		},
+		/* ------------------------------- End: Accordion functions -------------------------- */
+		isRadioButtonYes: function (fieldId)
+		{
+			return CORE.UI.radioButtonSelected(fieldId) && $("#" + fieldId + "_0")[0].checked; //Yes
+		},
+		isRadioButtonNo: function (fieldId)
+		{
+			return CORE.UI.radioButtonSelected(fieldId) && $("#" + fieldId + "_1")[0].checked; //No
+		},
+		setRadioButton: function (fieldId, yesOrNo)
+		{
+			if (yesOrNo)
+			{
+				$("#" + fieldId + "_1")[0].checked = true; // Set Yes
+			}
+			else
+			{
+				$("#" + fieldId + "_0")[0].checked = true; // Set No
+			}
+		},
+		getNumberOfRecordsOfSubgrid: function (subgridId)
+		{
+			return $("#" + subgridId).find('td[aria-label*="action menu"]').length;
+		},
+		/* 
+		 * Replaces the view changer of the entity list using tabs (.navigation & au-link-list)
+		 */
+		replaceViewsWithTabs: function ()
+		{
+			var navElement = document.createElement("nav");
+			navElement.id = "tabViews";
+			navElement.classList.add("navigation");
+			var ulElement = document.createElement("ul");
+			ulElement.classList.add("au-link-list");
+			ulElement.classList.add("au-link-list--inline");
+			$("#filterDropdownId ul li").each(function (i, item)
+			{
+				var liElement = document.createElement("li");
+				liElement.className = item.className;
+				var aId = item.innerText.replace(' ', '_');
+				var aElement = document.createElement("a");
+				aElement.id = aId;
+				aElement.innerHTML = item.innerText;
+				aElement.onclick = function ()
+				{
+					var filterElement = $("#filterDropdownId ul li a:contains('" + item.innerText + "')");
+					filterElement[0].click();
+					$("#tabViews ul li.active").removeClass("active");
+					$("#tabViews ul li a:contains('" + item.innerText + "')").parent().addClass("active");
+				}
+				liElement.appendChild(aElement);
+				ulElement.appendChild(liElement);
+			});
+			navElement.appendChild(ulElement);
+			$(".entitylist").parent()[0].prepend(navElement);
+		},
+		/*
+		 * Renders a UI Toggle into the specified container
+		 *
+		 * @param {string} containerId - The container javascript/jquery selector to add the toggle to.
+		 * @param {string} wrapperClass - Optional class name to add to the div wrapper of the toggle.
+		 * @param {string} displayName - the name to render next to the toggle
+		 * @param {string} id - the element id for future reference to this toggle and attaching event handlers.
+		 * @param {function} onchange - the function to run onChange (on toggle)
+		 * @param {bool} defaultValue - Optional default on or off (defaults to off if not provided)
+		 */
+		createUIToggle: function (containerId, wrapperClass, displayName, id, onchange, defaultValue)
+		{
+			var toggleDiv = document.createElement("div");
+			if (wrapperClass)
+			{
+				toggleDiv.className = wrapperClass;
+			}
+			var togglelabel = document.createElement("label");
+			togglelabel.className = "switch";
+			var toggleInput = document.createElement("input");
+			toggleInput.type = "checkbox";
+			toggleInput.id = id;
+			if (defaultValue)
+			{
+				toggleInput.checked = defaultValue;
+			}
+			toggleInput.onchange = onchange;
+			var toggleSpanSlid = document.createElement("span");
+			toggleSpanSlid.className = "slider";
+			togglelabel.appendChild(toggleInput);
+			togglelabel.appendChild(toggleSpanSlid);
+			toggleDiv.appendChild(togglelabel);
+			var toggleSpanText = document.createElement("span");
+			toggleSpanText.innerText = displayName;
+			toggleDiv.appendChild(toggleSpanText);
+			$('#' + containerId).append(toggleDiv);
+		},
+	};
+})();

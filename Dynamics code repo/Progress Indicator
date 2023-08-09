@@ -1,0 +1,293 @@
+var CORE = CORE || {};
+CORE.UI = CORE.UI || {};
+
+CORE.UI.ProgressIndicator = (function () {
+
+    /* ************* Private Members ************* */
+
+    // Object to capture the Query string values.
+    var parameters = {
+        id: null, 
+        stepId: null,
+        sessionId: null,
+        entityName: null,
+    };
+
+    /* ************* Private Functions ************* */
+
+    /*
+     * Initilises the Progress Indicator for a Web Page and a specific entity (schema name).
+     * 
+     * @param {string} entityName - the schema name of the entity e.g. "core_submission".
+     */
+    function init(entityName) {
+            initWithIdParamName(entityName,"id");
+    }
+
+    /*
+     * Initilises the Progress Indicator for a Web Page and a specific entity (schema name).
+     * 
+     * @param {string} entityName - the schema name of the entity e.g. "core_submission".
+     */
+    function initWithIdParamName(entityName, idParamName) {
+        parameters.id = CORE.Util.getQueryStringParameter(idParamName);
+        parameters.stepId = CORE.Util.getQueryStringParameter("stepid");
+        parameters.sessionId = CORE.Util.getQueryStringParameter("sessionid");
+        parameters.entityName = entityName;
+        updateProgressBar();
+
+        // If a stepId exists in session Storage then the user triggered a Step move.
+        // Get stepId and perform move
+        var data = sessionStorage.getItem('stepId');
+        if (data) {
+            sessionStorage.removeItem('stepId');
+            performMove(data);
+        }
+    }
+
+    /*
+     * Updates the ootb progress bar to include styles based on the status of the step, click through etc.
+     */
+    function updateProgressBar() {
+        if ($(".progress").length > 0) {
+            // Update the high level styles of the progress bar.
+            $(".progress").parent().removeClass("col-md-3");
+            $(".progress").parent().removeClass("col-sm-2");
+            $(".progress").parent().addClass("col-md-4");
+            $(".progress").parent().attr("style", "width:330px;");
+            $(".progress").addClass("progressindicator");
+            
+            var numOfSteps = $(".progress > li").length;
+
+            // Update each individual node of the progress bar.
+            $(".progress > li").each(function (index, step) {
+                if (step.innerText == "") return;
+
+                var stepInfo = getInformationForStep(step);
+                var statusStyle = "gray";
+
+                if (parameters.stepId == stepInfo.id || (index == 0 && (parameters.stepId == null))) {
+                    statusStyle = "active";
+                }
+                else if (stepInfo.status === "true") {
+                    statusStyle = "complete";
+                }
+                else if (stepInfo.status === "false") {
+                    statusStyle = "alert";
+                }
+
+                var isLastElement = index == numOfSteps -1;
+                SetupStep(step, stepInfo.class, statusStyle, stepInfo.id, isLastElement);
+
+                // WCAG. Add tabindex to LI elements so they could select and navigated by keyborad.
+                $(step).attr("tabindex", "0");
+            });
+            
+            // Show the progress bar.
+            $(".progress").show();
+        }
+    }
+
+    /*
+     * Initilises each step individually with the style, id, click event, etc. 
+     * - Adds a class to the (li) stepClass + "-" + stepStatus to match what is in the stylesheet - e.g. "sd-active"
+     *
+     * @param {string} stepElement  - The step element to apply the styles to
+     * @param {string} stepClass    - The css class acroynm to appear to the class.
+     * @param {string} stepStatus   - The status of the class
+     * @param {string} stepid       - The step id for the click event.
+     */
+    function SetupStep(stepElement, stepClass, stepStatus, stepid, isLastElement) {
+
+        // Setup steps as buttons
+        $(stepElement).addClass("btn");
+        $(stepElement).attr("id", stepid);
+
+        $(stepElement).unbind();
+        $(stepElement).click(function () {
+            goToStep(stepid);
+        });
+        
+        // WCAG compliance: prevent form from intercepting Enter click on custom buttons and submitting itself.
+        $(stepElement).on('keydown keypress', function (e) {
+            var keyCode = e.keyCode || e.which;
+
+            if (keyCode == '13') {
+                e.preventDefault();
+                goToStep(stepid);
+                return false;
+            }
+        });
+
+        // Setup text
+        $(stepElement)[0].innerHTML = "<span>" + stepElement.innerText + "</span>";
+        $(stepElement).removeClass("group-list-tem");
+
+        // Setup css of step by each step status. 
+        $(stepElement).addClass(stepClass + "-" + stepStatus);
+        $(stepElement).removeClass("list-group-item-success");
+        $(stepElement).removeClass("incomplete");
+
+        // Setup the arrow (if  its not the last element)
+        if (!isLastElement) {
+            $(stepElement).after("<div class='arrow'></div>");
+        }
+    
+        /*if (stepStatus == "gray")
+        {
+            //Modify the DOM to represent a step that has not yet been started
+            if ($($(stepElement)[0].lastElementChild).length > 0) {
+                $($(stepElement)[0].lastElementChild).remove();
+            }
+        }*/
+    }
+
+    /*
+     * Gets the HTML span content - <span class="stepInfo hidden"> which contains the information .
+     *
+     * @param {element} step - The Progress Indicator step element (li).
+     * @return {object} stepInfo - contains the values of the attributes, including the id, name, class and status of each step.
+     */
+    function getInformationForStep(step) {
+        var stepInfo = {
+            id: null,
+            name: null,
+            class: null,
+            status: null,
+        };
+
+        $(".stepInfo").each(function (index, info) {
+            this.stepId = info.id;
+            this.nameJson = $(info)[0].getAttribute("name").substring(0, $(info)[0].getAttribute("name").length - 1);
+            if (this.nameJson !== null && this.nameJson !== "" && this.nameJson !== "[") {
+                stepInfo.name = JSON.parse(this.nameJson)[0].Value;
+                var self = this;
+                if (step.innerText.toLowerCase() === stepInfo.name.toLowerCase()) {
+                    stepInfo.id = self.stepId;
+                    var stepCompleteInfo = getStepCompletedInfo(step.innerText);
+                    stepInfo.status = stepCompleteInfo.isStepComplete;
+                    stepInfo.class = stepCompleteInfo.stepClass;
+                    return false; //break from the .each statement - Found the right one.
+                }
+            }
+        });
+
+        return stepInfo;
+    }
+
+    /*
+     * Gets the HTML span content - <span class="completedStepInfo"> which captures the validity of the step.
+     *
+     * @param {string} stepName - The name of the step.
+     * @return {object} stepCompleted - contains the step class and is complete values.
+     */
+    function getStepCompletedInfo(stepName) {
+        var stepCompleted = {
+            stepClass: null,
+            isStepComplete: null,
+        };
+        var completedStepInfo = $(".completedStepInfo[for-step='" + stepName + "']");
+        if (completedStepInfo.length !== 0) {
+            stepCompleted.stepClass = completedStepInfo[0].getAttribute("stepclass");
+            stepCompleted.isStepComplete = completedStepInfo[0].getAttribute("valid");
+        }
+        return stepCompleted;
+    }
+
+    /*
+    * Get the name of the last step e.g. Declaration or Submit documents
+    */
+    function getLastStepName() {
+        var lastStep = $(".progress li").length - 1;
+        return $(".progress li span").eq(lastStep).text();
+    }    
+
+    /*
+     * Performs the validation and save functionality before redirecting to the page provided.
+     *
+     * @param {string} stepId - The Id (guid) of the step to redirect to.
+     */
+    function goToStep(stepId, cancelCallback) {
+        //Bypass Confirm on Exit for going next
+        var confirmOnExit = document.getElementById("confirmOnExit");
+        confirmOnExit.setAttribute("value", false);
+
+        //Check if the parameter step id exists (if it doesnt we are on 1st page, 1st open).
+        if (parameters.stepId) {
+            if ($(".progress").find("#" + parameters.stepId)[0].innerText != getLastStepName()) {
+                //save the stepId the user wants to move to, save the record (which causes it to go to sequential step, see: CORE.Validation.Initiate for next steps.)
+                sessionStorage.setItem('stepId', stepId);
+                var saveResult = CORE.Validation.saveAndNextOverride(function () {
+                    sessionStorage.removeItem('stepId');
+                    cancelCallback();
+                });
+                
+                // Fix to stop a page refresh from moving the page (when validation framework stops the user changing page) based on the session storage.
+                if (saveResult == false) {
+                    sessionStorage.removeItem('stepId');
+                }
+            }
+            else {
+                //Skip the save on the declaration page.
+                performMove(stepId);
+            };
+        } else {
+            //No stepid in Query string assume - first step on first open.
+            sessionStorage.setItem('stepId', stepId);
+            CORE.Validation.saveAndNextOverride();
+        }
+    }
+
+    /*
+     * Calls the CGI Pattern to get create/get the session id, and then redirect the user to the correct web form step.
+     *
+     * @param {string} stepId - the steps id (guid) to for where we are redirecting to. 
+     */
+    function performMove(stepId) {
+         $(".progress > li").each(function (index, step) {
+            if (step.id === stepId) {
+                var urlToUse = "";
+                if (parameters.sessionId != null) {
+                    urlToUse = "/Session/SetWebFormStep?sessionid=" + parameters.sessionId + "&stepid=" + stepId + "&cstring=" + Math.floor(Math.random() * 10000) + 1;
+                }
+                else {
+                    urlToUse = "/Session/SetWebFormStep?recordname=" + parameters.entityName + "&recordid=" + parameters.id + "&stepid=" + stepId + "&cstring=" + Math.floor(Math.random() * 10000) + 1;
+                }
+                CORE.UI.showLoadingModal(true);
+                $.ajax(
+                    {
+                        cache: false,
+                        url: urlToUse,
+                        dataType: "json",
+                        success: function (data) {
+                            window.location.replace("./?id=" + parameters.id + "&stepid=" + stepId + "&sessionid=" + data.results[0].result[0].erefValue.Id);
+                        },
+                        error: function (data) {
+                            //assume logged out...reload page to force a login.
+                            window.location.reload();
+                        },
+                        complete: function () { }
+                    });
+                //Reload the page if nothing has happened for 20 seconds. Assume something went wrong.
+                setTimeout(function () {
+                   window.location.reload();
+                }, 20000);
+            }
+        });
+    }
+    
+    /* ************* Public Functions ************* */
+    return {
+        Init: function (entityName) {
+            init(entityName);
+        },
+        initWithIdParamName: function (entityName, idParamName) {
+            initWithIdParamName(entityName, idParamName);
+        },
+        GoToStep: function (stepId, cancelCallback) {
+            goToStep(stepId, cancelCallback);
+        },
+
+    };
+
+})();
