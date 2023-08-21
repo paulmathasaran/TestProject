@@ -1,0 +1,46 @@
+//Sharepoint File Upload Validation
+	$('.modal-add-file .margin-addfile input').change(function ()
+	{
+		var existingFiles = $('.sharepoint-data tr').length - 1;
+		var self = $(this);
+		//Sharepoint upload functionality:max 5 documents
+		if (existingFiles + self[0].files.length > 5)
+		{
+			var Max5FileErrorMessage = "You can only upload up to 5 files.";
+			$(".modal-body").prepend('<div id="upload-error-Max5FileErrorMessage" class="alert alert-error alert-danger text-left alert-dismissible abn" role="alert"><span class="fa fa-exclamation-triangle" aria-hidden="true"></span><a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>' + Max5FileErrorMessage + '</div>');
+			self.val('');
+			return;
+		}
+		else
+		{
+			$(".alert-dismissible").remove();
+		}
+		// loop through each file to validate that the type is correct
+		//Sharepoint upload functionality: upload word document, PDF, PNG, JPG and JPEG images
+		$.each(self[0].files, function (i, e)
+		{
+			var validTypes = ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/pdf', 'image/png', 'image/jpg', 'image/jpeg'];
+			if (validTypes.indexOf(e.type) < 0)
+			{
+				var ValidTypesErrorMessage = "Your file should be an PDF, Docx or image (JPG,JPEG or PNG).";
+				$(".modal-body").prepend('<div id="upload-error-ValidTypesErrorMessage" class="alert alert-error alert-danger text-left alert-dismissible abn" role="alert"><span class="fa fa-exclamation-triangle" aria-hidden="true"></span><a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>' + ValidTypesErrorMessage + '</div>');
+				self.val('');
+				return false;
+			}
+			else
+			{
+				$(".alert-dismissible").remove();
+			}
+			//Sharepoint upload functionality: file size is bigger then 5MB
+			if (e.size > 5000000)
+			{
+				var FileSizErroreMessage = "Maximum file size is 5MB";
+				$(".modal-body").prepend('<div id="upload-error-FileSizErroreMessage" class="alert alert-error alert-danger text-left alert-dismissible abn" role="alert"><span class="fa fa-exclamation-triangle" aria-hidden="true"></span><a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>' + FileSizErroreMessage + '</div>');
+				self.val('');
+				return false;
+			}
+			else
+			{
+				$(".alert-dismissible").remove();
+			}
+		});
